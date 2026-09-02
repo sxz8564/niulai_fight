@@ -249,20 +249,44 @@ Re-texturing her goes through `npm run retexture` rather than the merge:
 npm run retexture superbaola incoming/textures/superbaola.glb
 ```
 
-A re-texture comes back as a *static* model — same mesh, new maps, no rig and
-no clips — so dropping it into `incoming/` and re-merging would throw the
-animations away. The maps move instead of the mesh: the rigged model keeps its
-skeleton, its weights and every clip, and only its material changes. That works
-because a re-texture is the same geometry with the same unwrap; the vertex
-counts differ a little, since rigging splits seams, but UVs do not move. The
-base colour and normal maps come across and the metallic-roughness one does
-not — taking it would override the factors the animated export set and turn a
-character that looked right into wet plastic.
+A re-texture comes back as a *static* model — the same character, new maps, no
+rig and no clips — so dropping it into `incoming/` and re-merging would throw
+the animations away.
 
-The proof is a render, not an argument, so look at one. There is also a check
-that the form can still play every state the game will ask it for, because a
-re-texture that came back without the clips would leave her frozen in her bind
-pose for seven seconds while every other check still passed — the damage
+The obvious shortcut is to move the maps: keep the rigged mesh and point its
+material at the new images. **That is wrong**, and it shipped once before it was
+caught. A re-texture comes back with its own UV unwrap — the same character laid
+out differently on the sheet — so the new image on the old unwrap is a smear.
+Putting the two atlases side by side is the two-second check that would have
+saved the trip; they look nothing alike.
+
+What *is* true is that the geometry is identical: every vertex of the new mesh
+lands exactly on a vertex of the old one once the unit-height export is scaled
+back up. So the mesh moves instead. The new geometry, with its own UVs, is bound
+to the old skeleton by copying each vertex's weights from the vertex it
+coincides with, and the old material keeps its shape and gets the new images.
+The clips never move at all.
+
+The vertex counts differ — 4104 against 4096 for Super Baola — because a
+different unwrap splits seams differently, which is why the match is by position
+rather than by index, and why every vertex has to find a partner or the tool
+refuses to write anything. Seven of hers land a thousandth of her height away
+from their partner, so a hash miss falls back to a nearest-neighbour search
+inside a tolerance; a miss beyond it means the models really are different.
+
+The old material keeps its shape on purpose. These exports put the same texture
+in three places — base colour, emissive at full white, and normal — which is how
+the generator makes a model read flat and unlit, and **the emissive is the slot
+that decides what the character actually looks like**. The first attempt
+replaced base colour and normal and left the emissive alone, which is why it
+came back looking exactly as it had: the new paint was underneath a layer
+nobody could see past.
+
+The proof is a render, not an argument, so look at one — of the animated model,
+in more than one clip, because that is where both halves of this can fail. There
+is also a check that the form can still play every state the game will ask it
+for, since a re-texture that came back without the clips would leave her frozen
+in her bind pose for seven seconds while every other check passed: the damage
 numbers belong to the Fighter and have nothing to do with whether anything is
 moving.
 
