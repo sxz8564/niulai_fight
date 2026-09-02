@@ -3,14 +3,30 @@
     "id": "niulai",
     "name": "Niulai",
     "nameChinese": "牛来",
-    "file": "niulai.glb",
+    "file": "niulai-rigged.glb",
     "role": "player",
-    "headScale": 1.0,
-    "headOffsetY": 0.0,
-    "bodyColor": "#d8431c",
-    "limbColor": "#b8351a",
-    "animated": false,
-    "clips": {}
+    "animated": true,
+    "scale": 0.588,
+
+    "_comment": "Trims are read off docs/clips/contact-sheet.png. The Meshy exports are whole performances — the punch is four seconds of standing in a guard stance with the punch in the middle of it — so each state names the slice worth playing. Speeds are not set here: the game's timings below decide how fast a slice plays, so the animation and the rules cannot disagree about when contact happens.",
+
+    "clips": {
+      "idle":  { "clip": "punch", "from": 0.00, "to": 1.30, "loop": true },
+      "punch": { "clip": "punch", "from": 1.45, "to": 2.45 },
+      "kick":  { "clip": "kick",  "from": 0.45, "to": 1.15 },
+      "knee":  { "clip": "knee",  "from": 0.70, "to": 1.60 },
+      "hit":   { "clip": "hit",   "from": 0.10, "to": 0.85 },
+      "jump":  { "clip": "jump" }
+    },
+
+    "_missing": "walk and down have not been delivered yet. Until they are, walk falls back to the guard-stance idle, so Niulai slides rather than strides, and down falls back to the hit reaction, so a knockdown looks like a flinch. Both are the fallbacks below, not the game failing.",
+
+    "fallbacks": {
+      "walk": "idle",
+      "down": "hit"
+    },
+
+    "timings": { "punch": 0.45, "kick": 0.38, "hit": 0.34, "down": 1.1 }
   },
   {
     "id": "wolfwolf",

@@ -98,17 +98,69 @@ export function createActor(spec, gltf) {
   let mixer = null;
   let actions = null;
   let parts = null;
+  let missing = [];
 
   if (spec.animated && gltf.animations && gltf.animations.length) {
-    // A rigged model brings its own body and its own motion.
+    /*
+     * A rigged model brings its own body and its own motion — but a clip as
+     * exported is rarely the clip a game wants. These arrive as complete
+     * performances: the punch is four seconds of standing in a guard stance
+     * with about half a second of punch in the middle of it. So each state
+     * names a clip and, optionally, the slice of it worth playing.
+     */
     const model = gltf.scene;
+    if (spec.scale) model.scale.setScalar(spec.scale);
+    // Without this the rigged character is the one thing on the field with no
+    // shadow, which reads as floating even when it is standing on the ground.
+    model.traverse((node) => {
+      if (node.isMesh || node.isSkinnedMesh) { node.castShadow = true; node.frustumCulled = false; }
+    });
     facing.add(model);
     mixer = new THREE.AnimationMixer(model);
     actions = {};
+    missing = [];
+
     for (const state of STATES) {
-      const name = (spec.clips && spec.clips[state]) || state;
-      const clip = THREE.AnimationClip.findByName(gltf.animations, name);
-      if (clip) actions[state] = mixer.clipAction(clip);
+      const entry = (spec.clips && spec.clips[state]) || state;
+      const config = typeof entry === 'string' ? { clip: entry } : entry;
+      const source = THREE.AnimationClip.findByName(gltf.animations, config.clip || state);
+      if (!source) { missing.push(state); continue; }
+
+      let clip = source;
+      if (config.from != null || config.to != null) {
+        // subclip counts in frames, so the seconds a human reads off a contact
+        // sheet are converted here rather than in the registry.
+        const fps = config.fps || 30;
+        const from = Math.round((config.from || 0) * fps);
+        const to = Math.round((config.to != null ? config.to : source.duration) * fps);
+        clip = THREE.AnimationUtils.subclip(source.clone(), `${state}`, from, to, fps);
+      }
+
+      const action = mixer.clipAction(clip);
+      const loops = config.loop != null ? config.loop : (state === 'idle' || state === 'walk');
+      action.setLoop(loops ? THREE.LoopRepeat : THREE.LoopOnce, Infinity);
+      // A one-shot has to hold its last frame, or the character snaps back to
+      // the bind pose for a frame between the punch and the idle.
+      action.clampWhenFinished = !loops;
+
+      /*
+       * The clip is fitted to the game's timing rather than the other way
+       * round. A punch that the rules give a quarter of a second and an
+       * animation that takes one will disagree about when contact happens, and
+       * the disagreement shows up as a hit that lands before the fist arrives.
+       * Deriving the speed from both numbers means they cannot drift apart.
+       */
+      const wanted = (spec.timings || {})[state];
+      if (wanted && clip.duration > 0) action.setEffectiveTimeScale(clip.duration / wanted);
+      else if (config.speed) action.setEffectiveTimeScale(config.speed);
+
+      actions[state] = action;
+    }
+
+    // A state with no clip falls back to one that exists, so a half-delivered
+    // character animates rather than freezing in its bind pose.
+    for (const [state, fallback] of Object.entries(spec.fallbacks || {})) {
+      if (!actions[state] && actions[fallback]) actions[state] = actions[fallback];
     }
   } else {
     const built = buildPlaceholderBody(spec);
@@ -127,9 +179,17 @@ export function createActor(spec, gltf) {
     head,
     get state() { return state; },
 
-    /** Faces +1 (right) or -1 (left). */
+    /**
+     * Faces +1 (right) or -1 (left).
+     *
+     * Both the heads and the rigged biped are authored facing +Z, which is
+     * straight at the camera. Turning them a quarter turn puts them side-on,
+     * facing along the belt they walk down — which is the whole point of the
+     * genre: you have to be able to see which way a character is about to
+     * swing, and a character facing the camera is facing nowhere.
+     */
     setFacing(dir) {
-      facing.rotation.y = dir >= 0 ? 0 : Math.PI;
+      facing.rotation.y = dir >= 0 ? Math.PI / 2 : -Math.PI / 2;
     },
 
     play(next) {
@@ -138,13 +198,17 @@ export function createActor(spec, gltf) {
         const from = actions[state];
         const to = actions[next];
         if (to) {
-          to.reset().play();
-          if (from && from !== to) from.crossFadeTo(to, 0.12, false);
+          const previous = from && from !== to ? from : null;
+          if (previous) previous.fadeOut(0.10);
+          to.reset().setEffectiveWeight(1).fadeIn(0.10).play();
         }
       }
       state = next;
       stateTime = 0;
     },
+
+    /** States the model had no clip for — reported so a gap is visible. */
+    get missingClips() { return missing; },
 
     /**
      * @param {number} dt seconds

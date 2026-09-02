@@ -15,6 +15,11 @@ import { clampToBelt } from './stage.js';
 export const REACH_X = 0.95;
 export const REACH_Z = 0.55;
 
+/* How long each action takes, unless a character overrides it. The same
+ * numbers drive the animation speed in actor.js, so a character with a slower
+ * punch animates slower rather than sliding out of sync with itself. */
+export const DEFAULT_TIMINGS = { punch: 0.26, kick: 0.34, hit: 0.22, down: 1.1 };
+
 export class Fighter {
   constructor(actor, options) {
     this.actor = actor;
@@ -25,6 +30,7 @@ export class Fighter {
     this.damage = options.damage;
     this.facing = options.facing ?? 1;
     this.team = options.team;
+    this.timings = { ...DEFAULT_TIMINGS, ...(options.timings || {}) };
 
     this.velocity = new THREE.Vector3();
     this.attackTimer = 0;      // >0 while an attack is playing
@@ -43,7 +49,7 @@ export class Fighter {
   attack(kind = 'punch') {
     if (!this.canAct) return false;
     this.attackKind = kind;
-    this.attackTimer = kind === 'kick' ? 0.34 : 0.26;
+    this.attackTimer = this.timings[kind] || DEFAULT_TIMINGS.punch;
     this.hasLanded = false;
     this.actor.play(kind);
     return true;
@@ -52,7 +58,7 @@ export class Fighter {
   /** True while the attack is in the frames that can connect. */
   get striking() {
     if (this.attackTimer <= 0 || this.hasLanded) return false;
-    const total = this.attackKind === 'kick' ? 0.34 : 0.26;
+    const total = this.timings[this.attackKind] || DEFAULT_TIMINGS.punch;
     const elapsed = total - this.attackTimer;
     return elapsed > total * 0.25 && elapsed < total * 0.7;
   }
@@ -71,12 +77,12 @@ export class Fighter {
 
     if (this.health <= 0) {
       this.health = 0;
-      this.downTimer = 1.1;
+      this.downTimer = this.timings.down;
       this.actor.play('down');
       this.velocity.x = fromDirection * 5.0;
       return true;
     }
-    this.stunTimer = 0.22;
+    this.stunTimer = this.timings.hit;
     this.actor.play('hit');
     return true;
   }

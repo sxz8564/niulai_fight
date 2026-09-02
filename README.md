@@ -39,19 +39,25 @@ To play it without the extension at all:
 npm run serve      # then open the printed address
 ```
 
-## The characters are heads
+## The characters
 
-Niulai and Wolfwolf are the real models from the
-[Critter Cam filter](https://github.com/sxz8564/niulai_filter) — the same
-`.glb` files, byte for byte. They are *heads*, because that is all a face
-filter ever needed, so the bodies here are built from primitives and animated
-by rotating them.
+**Niulai is rigged.** He is a full skinned biped with five motion-captured
+clips — punch, kick, knee, hit reaction, jump — merged into one
+`assets/models/niulai-rigged.glb` by `npm run models`.
 
-That is a placeholder with a door left open: everything the game asks of a
-character goes through `play()` and `update()`, so a rigged model with
-animation clips drops in behind the same two calls without the game changing.
-[docs/MODELS.md](docs/MODELS.md) is the contract — clip names, the six states,
-and the two attack timings the animation has to agree with.
+Two of the six states have not been delivered yet, and the registry says so out
+loud: `walk` falls back to the guard-stance idle, so he slides rather than
+strides, and `down` falls back to the hit reaction, so a knockdown reads as a
+flinch. Neither is the game failing; both go away when the clips arrive.
+
+**Wolfwolf is still a head on a placeholder body**, built from primitives and
+animated by rotating them — the wolf model is the one from the
+[Critter Cam filter](https://github.com/sxz8564/niulai_filter), which is a head
+because that is all a face filter ever needed.
+
+Both go through the same `play()` and `update()`, so the two kinds coexist and
+either can be swapped without the game changing.
+[docs/MODELS.md](docs/MODELS.md) is the contract.
 
 ## Tests
 

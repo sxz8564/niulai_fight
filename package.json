@@ -10,7 +10,9 @@
     "serve": "node tools/serve.mjs",
     "test": "node tools/smoke-test.mjs",
     "package": "node tools/package.mjs",
-    "test:extension": "node tools/extension-test.mjs"
+    "test:extension": "node tools/extension-test.mjs",
+    "models": "node tools/merge-animations.mjs",
+    "clips": "node tools/clip-sheet.mjs"
   },
   "dependencies": {
     "three": "0.185.1"

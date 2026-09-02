@@ -3,3 +3,8 @@ dist/
 .DS_Store
 *.log
 .smoke/
+
+# Meshy's one-clip-per-file exports, ~5 MB each and all carrying the same mesh.
+# tools/merge-animations.mjs turns them into assets/models/niulai-rigged.glb,
+# which is what the game loads and what is committed.
+incoming/

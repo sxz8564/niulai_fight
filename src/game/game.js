@@ -98,7 +98,9 @@ export class Game {
     const actor = createActor(spec, this.gltfs[id]);
     actor.root.position.set(at.x, 0, at.z);
     this.scene.add(actor.root);
-    const fighter = new Fighter(actor, { ...stats, facing: stats.facing ?? 1 });
+    const fighter = new Fighter(actor, {
+      ...stats, facing: stats.facing ?? 1, timings: spec.timings
+    });
     actor.setFacing(fighter.facing);
     return fighter;
   }
