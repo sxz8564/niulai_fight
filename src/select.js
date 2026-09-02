@@ -134,6 +134,11 @@ function portrait(canvas, loader, assetBase, spec) {
    * A slow sway rather than a full turn. A character select is showing you a
    * face; a turntable spends half its time showing you the back of a head, and
    * whichever card you glance at is as likely as not to be facing away.
+   *
+   * Small, too. A quarter of a radian was still enough to catch both fighters
+   * side-on at once — which is exactly what the store screenshot kept catching,
+   * and a portrait nobody can see the face of is not a portrait. This keeps the
+   * life in it and never turns far enough to lose the face.
    */
   let elapsed = 0;
   function frame() {
@@ -141,7 +146,7 @@ function portrait(canvas, loader, assetBase, spec) {
     const dt = clock.getDelta();
     elapsed += dt;
     if (mixer) mixer.update(dt);
-    turntable.rotation.y = Math.sin(elapsed * 0.7) * 0.5;
+    turntable.rotation.y = Math.sin(elapsed * 0.7) * 0.22;
     renderer.render(scene, camera);
   }
   raf = requestAnimationFrame(frame);

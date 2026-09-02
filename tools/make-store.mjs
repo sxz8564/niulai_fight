@@ -114,6 +114,27 @@ await page.screenshot({ path: join(out, '3-mama.png'), animations: 'disabled' })
 console.log('3-mama.png');
 
 /*
+ * The same moment again with the interface taken away, for the promo tiles.
+ *
+ * The tile used to be cut from the boss instead. The Cart rearing up is the
+ * most dramatic thing in the game to *play*, but on a 440-pixel tile it is a
+ * dark grey wedge on green grass, and the tile's own line promises ten mamas.
+ * Ten gold animals ploughing into a line of wolves is the frame that is legible
+ * at that size and the one the words are about.
+ */
+const plate = await page.evaluate(() => {
+  const api = globalThis.__niulaiFight;
+  const g = api.game;
+  document.getElementById('hud').style.visibility = 'hidden';
+  document.getElementById('banner').hidden = true;
+  api.step(0.02);
+  g.render();
+  const frame = document.getElementById('view').toDataURL('image/png');
+  document.getElementById('hud').style.visibility = '';
+  return frame;
+});
+
+/*
  * The boss, caught in its wind-up. This is the one frame that says the game has
  * an ending: the Cart reared back with a second to go, which is exactly what a
  * player sees before it comes at them.
@@ -157,18 +178,6 @@ await page.evaluate(() => {
 await page.screenshot({ path: join(out, '4-boss.png'), animations: 'disabled' });
 console.log('4-boss.png');
 
-// A clean frame of the world with no interface, for the promo tiles. The boss
-// is the strongest thing in the game to put on a tile, so it is taken here.
-const plate = await page.evaluate(() => {
-  const api = globalThis.__niulaiFight;
-  const g = api.game;
-  document.getElementById('hud').style.visibility = 'hidden';
-  document.getElementById('banner').hidden = true;
-  api.step(0.12);
-  g.render();
-  return document.getElementById('view').toDataURL('image/png');
-});
-
 /*
  * The ending. Cleared for real rather than by setting `over` by hand, because
  * the celebration only starts on the path the game actually takes to its ending
@@ -177,7 +186,6 @@ const plate = await page.evaluate(() => {
 await page.evaluate(() => {
   const api = globalThis.__niulaiFight;
   const g = api.game;
-  document.getElementById('hud').style.visibility = '';
   g.score = 12400;
   for (const enemy of g.enemies) g.scene.remove(enemy.root);
   g.enemies = [];
@@ -215,7 +223,15 @@ await page.evaluate(() => {
   g.spawnTimer = 0;
   api.step(3);
   g.enemies.forEach((wolf, i) => {
-    wolf.root.position.set(g.player.position.x + 1.5 + i * 0.85, 0, -1.0 + i * 0.7);
+    /*
+     * Around her, not all to one side. The camera trails the player, so a line
+     * of wolves placed entirely to the right leaves half the picture as empty
+     * grass — and the thing this shot has to sell is that she is bigger than
+     * the things surrounding her.
+     */
+    const side = i % 2 ? -1 : 1;
+    const rank = Math.floor(i / 2);
+    wolf.root.position.set(g.player.position.x + side * (1.35 + rank * 0.95), 0, -1.0 + i * 0.55);
     wolf.stunTimer = 0; wolf.attackTimer = 0; wolf.thinkTimer = 99;
   });
 
