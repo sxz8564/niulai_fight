@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Niulai Fight 牛来大战</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ctext y='26' font-size='26'%3E%F0%9F%90%AE%3C/text%3E%3C/svg%3E">
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #10141a;
+               font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; }
+  #view { display: block; width: 100vw; height: 100vh; touch-action: none; }
+
+  /* The HUD sits over the picture and never takes pointer events, so a tap
+     meant for a control button is not eaten by the score. */
+  #hud { position: fixed; inset: 0; pointer-events: none; padding: 14px;
+         display: flex; flex-direction: column; gap: 10px; }
+  .row { display: flex; align-items: center; gap: 14px; }
+  .bar { width: min(38vw, 280px); height: 16px; border: 2px solid #f4e7cf;
+         background: #2a1d16; padding: 2px; }
+  .bar > i { display: block; height: 100%; width: 100%; background: #7ec850;
+             transition: width 120ms linear; }
+  .bar > i.low { background: #d9483b; }
+  .label { color: #f4e7cf; font-size: 13px; letter-spacing: .08em; text-shadow: 0 2px 0 #000; }
+  .spacer { flex: 1; }
+
+  #banner { position: fixed; inset: 0; display: grid; place-items: center;
+            color: #ffd76a; font-size: clamp(22px, 5vw, 54px); letter-spacing: .1em;
+            text-shadow: 0 4px 0 #000; pointer-events: none; }
+  #loading { position: fixed; inset: 0; display: grid; place-items: center;
+             color: #f4e7cf; background: #10141a; font-size: 15px; letter-spacing: .1em; }
+  /* An id selector outranks the browser's own [hidden] rule, so setting
+     .hidden on these would otherwise change nothing and leave the loading
+     screen sitting on top of a running game. */
+  #loading[hidden], #banner[hidden] { display: none; }
+
+  #pad { position: fixed; inset: auto 0 0 0; padding: 18px;
+         display: flex; justify-content: space-between; pointer-events: none; }
+  #pad div { display: grid; grid-template-columns: repeat(3, 56px); gap: 6px; pointer-events: auto; }
+  #pad button { height: 56px; border: 2px solid #f4e7cf; background: #2a1d1699;
+                color: #f4e7cf; font: inherit; font-size: 18px; border-radius: 8px;
+                touch-action: none; user-select: none; }
+  #pad button:active { background: #f4e7cf; color: #2a1d16; }
+  .hint { color: #8b95a3; font-size: 12px; letter-spacing: .06em; }
+  /* A keyboard makes the on-screen pad redundant, and it covers the ground. */
+  @media (hover: hover) and (pointer: fine) { #pad { display: none; } }
+</style>
+</head>
+<body>
+<canvas id="view"></canvas>
+
+<div id="hud">
+  <div class="row">
+    <span class="label">NIULAI 牛来</span>
+    <span class="bar"><i id="health"></i></span>
+    <span class="label" id="lives">🐮🐮🐮</span>
+    <span class="spacer"></span>
+    <span class="label">STAGE <b id="stage">1/5</b></span>
+    <span class="label">SCORE <b id="score">000000</b></span>
+  </div>
+  <div class="row"><span class="hint">← → move · ↑ ↓ step up and down · J punch · K kick</span></div>
+</div>
+
+<div id="banner" hidden></div>
+<div id="loading">LOADING…</div>
+
+<div id="pad">
+  <div>
+    <button data-action="left" aria-label="left">◀</button>
+    <button data-action="up" aria-label="up">▲</button>
+    <button data-action="right" aria-label="right">▶</button>
+    <span></span>
+    <button data-action="down" aria-label="down">▼</button>
+    <span></span>
+  </div>
+  <div style="grid-template-columns: repeat(2, 56px)">
+    <button data-action="punch" aria-label="punch">P</button>
+    <button data-action="kick" aria-label="kick">K</button>
+  </div>
+</div>
+
+<script type="module" src="dist/bundle.js"></script>
+</body>
+</html>

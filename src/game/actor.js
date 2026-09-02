@@ -1,0 +1,232 @@
+import * as THREE from 'three';
+
+/*
+ * An actor is a head plus a body.
+ *
+ * The heads are the real character models from Critter Cam — they are heads and
+ * nothing else, because that is what a face filter needs. A brawler needs
+ * something to throw a punch with, so until a rigged full-body model exists the
+ * body is built here out of primitives and animated procedurally.
+ *
+ * That is a placeholder, but it is a deliberate one: everything the rest of the
+ * game asks of an actor goes through `play()` and `update()`, so a real rigged
+ * model with animation clips drops in behind the same two calls. Set
+ * `animated: true` in assets/models/index.json, name the clips, and nothing
+ * outside this file needs to know which kind it got.
+ */
+
+/** The states the game asks for. A rigged model needs a clip for each. */
+export const STATES = ['idle', 'walk', 'punch', 'kick', 'hit', 'down'];
+
+const UNIT = 1.0;            // one world unit is roughly one character height
+const HEAD_HEIGHT = 0.42;    // how much of that height the head takes up
+
+/**
+ * Builds a body from primitives, sized to sit under a head of the given width.
+ * Limbs hang off pivot groups so a rotation swings them from the shoulder or
+ * hip rather than about their own centre.
+ */
+function buildPlaceholderBody(spec) {
+  const body = new THREE.Color(spec.bodyColor || '#b45309');
+  const limb = new THREE.Color(spec.limbColor || '#92400e');
+  const skin = (c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.85, metalness: 0.0 });
+
+  const group = new THREE.Group();
+  const parts = {};
+
+  const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.17, 0.24, 4, 12), skin(body));
+  torso.position.y = 0.40;
+  torso.castShadow = true;
+  group.add(torso);
+  parts.torso = torso;
+
+  // Arms and legs are each a pivot at the joint with the limb hanging below,
+  // so `pivot.rotation.x` reads as "swing forward" everywhere below.
+  function makeLimb(length, radius, x, y, material) {
+    const pivot = new THREE.Group();
+    pivot.position.set(x, y, 0);
+    const mesh = new THREE.Mesh(new THREE.CapsuleGeometry(radius, length, 4, 8), material);
+    mesh.position.y = -length / 2 - radius * 0.5;
+    mesh.castShadow = true;
+    pivot.add(mesh);
+    group.add(pivot);
+    return pivot;
+  }
+
+  parts.armL = makeLimb(0.22, 0.058, 0.20, 0.52, skin(limb));
+  parts.armR = makeLimb(0.22, 0.058, -0.20, 0.52, skin(limb));
+  parts.legL = makeLimb(0.26, 0.070, 0.09, 0.28, skin(limb));
+  parts.legR = makeLimb(0.26, 0.070, -0.09, 0.28, skin(limb));
+
+  return { group, parts };
+}
+
+/** Where the head sits, so a model swap does not move the character's eyeline. */
+function mountHead(scene3d, spec) {
+  const holder = new THREE.Group();
+  holder.position.y = 0.62 + (spec.headOffsetY || 0);
+
+  const head = scene3d.clone(true);
+  // The head models are authored about one unit wide facing +Z, which is the
+  // same convention the filter used, so they need only scaling to fit.
+  const box = new THREE.Box3().setFromObject(head);
+  const size = new THREE.Vector3();
+  box.getSize(size);
+  const scale = (HEAD_HEIGHT / Math.max(size.y, 1e-4)) * (spec.headScale || 1);
+  head.scale.setScalar(scale);
+
+  // Re-centre on the head's own middle, so a model whose origin sits at the
+  // neck and one whose origin sits at the crown both land in the same place.
+  const centre = new THREE.Vector3();
+  box.getCenter(centre);
+  head.position.set(-centre.x * scale, -centre.y * scale + HEAD_HEIGHT * 0.18, -centre.z * scale);
+
+  head.traverse((node) => { if (node.isMesh) node.castShadow = true; });
+  holder.add(head);
+  return { holder, head };
+}
+
+export function createActor(spec, gltf) {
+  const root = new THREE.Group();
+  root.name = spec.id;
+
+  const facing = new THREE.Group();   // yaw only; the game flips this to turn
+  root.add(facing);
+
+  const { holder, head } = mountHead(gltf.scene, spec);
+
+  let mixer = null;
+  let actions = null;
+  let parts = null;
+
+  if (spec.animated && gltf.animations && gltf.animations.length) {
+    // A rigged model brings its own body and its own motion.
+    const model = gltf.scene;
+    facing.add(model);
+    mixer = new THREE.AnimationMixer(model);
+    actions = {};
+    for (const state of STATES) {
+      const name = (spec.clips && spec.clips[state]) || state;
+      const clip = THREE.AnimationClip.findByName(gltf.animations, name);
+      if (clip) actions[state] = mixer.clipAction(clip);
+    }
+  } else {
+    const built = buildPlaceholderBody(spec);
+    parts = built.parts;
+    facing.add(built.group);
+    facing.add(holder);
+  }
+
+  let state = 'idle';
+  let stateTime = 0;
+  let phase = 0;      // walk-cycle phase, kept across states so gait is continuous
+
+  return {
+    root,
+    facing,
+    head,
+    get state() { return state; },
+
+    /** Faces +1 (right) or -1 (left). */
+    setFacing(dir) {
+      facing.rotation.y = dir >= 0 ? 0 : Math.PI;
+    },
+
+    play(next) {
+      if (next === state) return;
+      if (actions) {
+        const from = actions[state];
+        const to = actions[next];
+        if (to) {
+          to.reset().play();
+          if (from && from !== to) from.crossFadeTo(to, 0.12, false);
+        }
+      }
+      state = next;
+      stateTime = 0;
+    },
+
+    /**
+     * @param {number} dt seconds
+     * @param {number} speed 0..1, how fast the actor is travelling — drives the
+     *   gait so a character that is barely moving does not sprint on the spot.
+     */
+    update(dt, speed = 0) {
+      stateTime += dt;
+      if (mixer) { mixer.update(dt); return; }
+      if (!parts) return;
+
+      phase += dt * (4 + speed * 6);
+
+      const { armL, armR, legL, legR, torso } = { ...parts, torso: parts.torso };
+      const reset = () => {
+        armL.rotation.set(0, 0, 0); armR.rotation.set(0, 0, 0);
+        legL.rotation.set(0, 0, 0); legR.rotation.set(0, 0, 0);
+        holder.rotation.set(0, 0, 0);
+        torso.rotation.set(0, 0, 0);
+        holder.position.y = 0.62 + (spec.headOffsetY || 0);
+      };
+      reset();
+
+      switch (state) {
+        case 'walk': {
+          const swing = Math.sin(phase) * (0.35 + speed * 0.35);
+          legL.rotation.x = swing;
+          legR.rotation.x = -swing;
+          armL.rotation.x = -swing * 0.7;
+          armR.rotation.x = swing * 0.7;
+          holder.position.y += Math.abs(Math.sin(phase)) * 0.02;
+          break;
+        }
+        case 'punch': {
+          // Out fast, back slow: a punch that returns at the speed it left
+          // reads as a wave.
+          const t = Math.min(1, stateTime / 0.26);
+          const reach = t < 0.35 ? t / 0.35 : 1 - (t - 0.35) / 0.65;
+          armR.rotation.x = -1.5 * reach;
+          torso.rotation.y = -0.35 * reach;
+          holder.rotation.y = -0.2 * reach;
+          break;
+        }
+        case 'kick': {
+          const t = Math.min(1, stateTime / 0.34);
+          const reach = t < 0.4 ? t / 0.4 : 1 - (t - 0.4) / 0.6;
+          legR.rotation.x = -1.6 * reach;
+          torso.rotation.x = 0.25 * reach;
+          armL.rotation.x = 0.6 * reach;
+          break;
+        }
+        case 'hit': {
+          const t = Math.min(1, stateTime / 0.22);
+          const recoil = Math.sin(t * Math.PI);
+          torso.rotation.x = -0.4 * recoil;
+          holder.rotation.x = -0.5 * recoil;
+          armL.rotation.x = 0.5 * recoil;
+          armR.rotation.x = 0.5 * recoil;
+          break;
+        }
+        case 'down': {
+          const t = Math.min(1, stateTime / 0.3);
+          root.children[0].rotation.z = 0; // facing group keeps its yaw
+          torso.rotation.x = -1.35 * t;
+          holder.rotation.x = -1.2 * t;
+          holder.position.y = 0.62 - 0.34 * t;
+          legL.rotation.x = 0.9 * t;
+          legR.rotation.x = 0.7 * t;
+          break;
+        }
+        default: {
+          // Idle: breathing, and a slow sway so a standing character is not a
+          // statue.
+          const b = Math.sin(stateTime * 2.2);
+          holder.position.y += b * 0.012;
+          armL.rotation.x = b * 0.06;
+          armR.rotation.x = -b * 0.06;
+          torso.rotation.z = Math.sin(stateTime * 1.1) * 0.02;
+        }
+      }
+    }
+  };
+}
+
+export { UNIT };

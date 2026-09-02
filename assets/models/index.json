@@ -1,0 +1,28 @@
+[
+  {
+    "id": "niulai",
+    "name": "Niulai",
+    "nameChinese": "牛来",
+    "file": "niulai.glb",
+    "role": "player",
+    "headScale": 1.0,
+    "headOffsetY": 0.0,
+    "bodyColor": "#d8431c",
+    "limbColor": "#b8351a",
+    "animated": false,
+    "clips": {}
+  },
+  {
+    "id": "wolfwolf",
+    "name": "Wolfwolf",
+    "nameChinese": "狼狼",
+    "file": "wolfwolf.glb",
+    "role": "enemy",
+    "headScale": 0.95,
+    "headOffsetY": 0.0,
+    "bodyColor": "#3b3129",
+    "limbColor": "#2c241e",
+    "animated": false,
+    "clips": {}
+  }
+]

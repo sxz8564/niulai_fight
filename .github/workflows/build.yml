@@ -1,0 +1,52 @@
+name: Build
+
+# The game is only worth anything if it still plays, and "still plays" is not
+# something a linter can tell you. Both suites here drive the real build the
+# way a player does.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  play:
+    name: Build and play
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # Playwright brings its own Chromium. --with-deps installs the system
+      # libraries a headless browser needs on a bare runner.
+      - name: Install a browser to play in
+        run: npx --yes playwright@1.56.0 install --with-deps chromium
+
+      - run: npm run build
+
+      - name: Play it over http
+        run: npm test
+
+      - name: Play it as a Chrome extension
+        run: npm run test:extension
+
+      - name: Keep the screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: .smoke/*.png
+          if-no-files-found: warn
