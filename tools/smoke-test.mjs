@@ -37,7 +37,10 @@ const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
 const errors = [];
 page.on('pageerror', (error) => errors.push(String(error)));
 page.on('response', (r) => { if (r.status() >= 400) errors.push(`HTTP ${r.status()} ${r.url()}`); });
-page.on('requestfailed', (r) => errors.push(`request failed ${r.url()}`));
+page.on('requestfailed', (r) => {
+  const why = r.failure() ? r.failure().errorText : 'unknown';
+  errors.push(`request failed (${why}) ${r.url()}`);
+});
 
 await page.goto(url, { waitUntil: 'load' });
 await page.waitForFunction(() => globalThis.__niulaiFight, null, { timeout: 60000 });

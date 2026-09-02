@@ -93,7 +93,14 @@ export function createActor(spec, gltf) {
   const facing = new THREE.Group();   // yaw only; the game flips this to turn
   root.add(facing);
 
-  const { holder, head } = mountHead(gltf.scene, spec);
+  /*
+   * Only the placeholder path needs a head mounted on a built body. This used
+   * to run for every character, which meant a rigged model had its entire
+   * skinned mesh deep-cloned and scaled on load for a holder that was then
+   * never added to the scene — invisible, but paid for in memory every time.
+   */
+  let holder = null;
+  let head = null;
 
   let mixer = null;
   let actions = null;
@@ -167,6 +174,9 @@ export function createActor(spec, gltf) {
       if (!actions[state] && actions[fallback]) actions[state] = actions[fallback];
     }
   } else {
+    const mounted = mountHead(gltf.scene, spec);
+    holder = mounted.holder;
+    head = mounted.head;
     const built = buildPlaceholderBody(spec);
     parts = built.parts;
     facing.add(built.group);
@@ -240,6 +250,7 @@ export function createActor(spec, gltf) {
       phase += dt * (4 + speed * 6);
 
       const { armL, armR, legL, legR, torso } = { ...parts, torso: parts.torso };
+      if (!holder) return;
       const reset = () => {
         armL.rotation.set(0, 0, 0); armR.rotation.set(0, 0, 0);
         legL.rotation.set(0, 0, 0); legR.rotation.set(0, 0, 0);

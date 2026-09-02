@@ -16,6 +16,13 @@ Runs as a Chrome extension. Click the toolbar button and it opens in a tab.
 | **↑ ↓** | step up and down the belt |
 | **J** or **Space** | punch |
 | **K** | kick |
+| **L** or **Shift** (hold) | block |
+
+Blocking works against what you are facing and not against what you are not,
+which is what makes it a decision about where you are looking rather than a
+button that turns damage off. A fifth of the damage still gets through, so
+turtling cannot outlast a wave, and holding it costs your movement and your
+offence.
 
 Stepping up and down is not decoration. An attack only lands if you are close
 in X *and* nearly level in Z, so a wolf standing a metre upstage cannot hit you
@@ -41,24 +48,22 @@ npm run serve      # then open the printed address
 
 ## The characters
 
-**Niulai is rigged**, with ten clips merged into one
-`assets/models/niulai-rigged.glb` by `npm run models`: punch, kick, knee, hit,
-knockdown, walk, run, and three flavours of jump. Every state the game asks for
-now has a real animation behind it.
+**Both characters are rigged bipeds.** `npm run models` reads one folder per
+character under `incoming/` and writes a single `.glb` each — 11 clips for
+Niulai, 10 for Wolfwolf, around 0.9 MB apiece.
 
-Locomotion uses the **run** cycle rather than the walk one, because the player
-covers about four body-heights a second, and its speed follows the character's
-actual ground speed so the feet do not skate. The walk cycle is in the file for
-slower characters. Three clips — walk, hurdle, back-jump — are merged and
-trimmed but not yet bound to anything; jumping needs an air state first.
+Locomotion speed follows actual ground speed, so nobody skates. Niulai uses the
+**run** cycle because he covers about four body-heights a second; the wolves,
+at 2.5, use the **walk** one. Niulai blocks and the wolves do not — that stays
+the player's move.
 
-**Wolfwolf is still a head on a placeholder body**, built from primitives and
-animated by rotating them — the wolf model is the one from the
-[Critter Cam filter](https://github.com/sxz8564/niulai_filter), which is a head
-because that is all a face filter ever needed.
+Spare clips are merged and named but not yet bound to anything: hurdle,
+back-jump and the wolf's jumping punch. Jumping needs an air state first; the
+knee is an obvious heavy attack whenever a third button is wanted.
 
-Both go through the same `play()` and `update()`, so the two kinds coexist and
-either can be swapped without the game changing.
+The placeholder path — a head model on a body built from primitives — is still
+there for a character that has no rig yet. Set `animated: false` and it takes
+over. Both kinds go through the same `play()` and `update()`, so they coexist.
 [docs/MODELS.md](docs/MODELS.md) is the contract.
 
 ## Tests

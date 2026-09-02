@@ -4,7 +4,12 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 /*
- * Turns a folder of one-clip Meshy exports into a single playable character.
+ * Turns folders of one-clip Meshy exports into playable characters.
+ *
+ * One folder per character under incoming/, named for the character:
+ *
+ *   incoming/niulai/*.glb    -> assets/models/niulai-rigged.glb
+ *   incoming/wolfwolf/*.glb  -> assets/models/wolfwolf-rigged.glb
  *
  *   node tools/merge-animations.mjs
  *
@@ -45,6 +50,7 @@ const NAMING = [
   { match: /Hit_Reaction|BeHit/i, name: 'hit' },
   { match: /Jump_Over_Obstacle/i, name: 'hurdle' },
   { match: /Back_Jump/i, name: 'backjump' },
+  { match: /Jumping_Punch/i, name: 'jumppunch' },
   { match: /Regular_Jump|^.*Jump/i, name: 'jump' },
   { match: /Running|Run(?!g)/i, name: 'run' },
   { match: /Walking|Walk/i, name: 'walk' },
@@ -71,31 +77,43 @@ function clipNameFor(file) {
  */
 const ROOT_RISE = { down: 0.3 };
 
-const files = readdirSync(inbox).filter((f) => f.toLowerCase().endsWith('.glb')).sort();
-if (!files.length) {
-  console.error(`No .glb files in ${inbox}`);
+/* Each subfolder of incoming/ is one character. */
+const characters = readdirSync(inbox, { withFileTypes: true })
+  .filter((entry) => entry.isDirectory())
+  .map((entry) => entry.name)
+  .sort();
+
+if (!characters.length) {
+  console.error(`No character folders in ${inbox}. Expected e.g. ${inbox}/niulai/*.glb`);
   process.exit(1);
 }
-
-const named = files.map((file) => ({ file, state: clipNameFor(file) }));
-for (const entry of named) {
-  if (!entry.state) console.warn(`  ? no state matched for ${entry.file} — it will keep its own name`);
-}
-
-const payload = named.map(({ file, state }) => ({
-  file,
-  state,
-  base64: readFileSync(join(inbox, file)).toString('base64')
-}));
 
 const browser = await chromium.launch({
   args: ['--no-sandbox', '--enable-unsafe-swiftshader'],
   executablePath: process.env.PLAYWRIGHT_CHROMIUM || undefined
 });
-const page = await browser.newPage();
-await page.addScriptTag({ content: readFileSync(join(root, 'dist/merge-deps.js'), 'utf8') });
 
-const result = await page.evaluate(async ({ inputs, riseFor }) => {
+mkdirSync(outDir, { recursive: true });
+
+for (const character of characters) {
+  const folder = join(inbox, character);
+  const files = readdirSync(folder).filter((f) => f.toLowerCase().endsWith('.glb')).sort();
+  if (!files.length) { console.warn(`  ${character}: no .glb files, skipped`); continue; }
+
+  const named = files.map((file) => ({ file, state: clipNameFor(file) }));
+  for (const entry of named) {
+    if (!entry.state) console.warn(`  ? ${character}: no state matched for ${entry.file}`);
+  }
+  const payload = named.map(({ file, state }) => ({
+    file, state, base64: readFileSync(join(folder, file)).toString('base64')
+  }));
+
+  // A fresh page per character: the previous one is holding a few hundred
+  // megabytes of decoded texture and skinned geometry.
+  const page = await browser.newPage();
+  await page.addScriptTag({ content: readFileSync(join(root, 'dist/merge-deps.js'), 'utf8') });
+
+  const result = await page.evaluate(async ({ inputs, riseFor }) => {
   const { GLTFLoader, GLTFExporter, THREE } = globalThis.__mergeDeps;
   const loader = new GLTFLoader();
 
@@ -228,19 +246,30 @@ const result = await page.evaluate(async ({ inputs, riseFor }) => {
   };
 }, { inputs: payload, riseFor: ROOT_RISE });
 
-mkdirSync(outDir, { recursive: true });
-const out = join(outDir, 'niulai-rigged.glb');
-writeFileSync(out, Buffer.from(result.base64, 'base64'));
+  const names = result.report.map((clip) => clip.state);
+  const duplicates = names.filter((name, index) => names.indexOf(name) !== index);
+  if (duplicates.length) {
+    console.error(`\n${character}: two clips share a name: ${[...new Set(duplicates)].join(', ')}`);
+    console.error('  A lookup by name returns the first match, so one of them would silently');
+    console.error('  never play. Add a rule to NAMING that tells them apart.');
+    process.exitCode = 1;
+  }
 
-console.log(`\n${out}`);
-console.log(`  ${(readFileSync(out).length / 1048576).toFixed(1)} MB, ${result.report.length} clips`);
-console.log(`  rest pose: ${result.size.y.toFixed(3)} tall, feet at y=${result.min.y.toFixed(3)}`);
-console.log(`  textures: ${result.textures.join(', ') || 'none'} (written as WebP)`);
-console.log(`  suggested "scale": ${(1 / result.size.y).toFixed(3)}  (to stand one unit tall)\n`);
-for (const clip of result.report) {
-  console.log(`  ${clip.state.padEnd(8)} ${String(clip.seconds).padStart(6)}s  ` +
-    `${clip.tracks} tracks, ${clip.rootTracksFlattened} root flattened` +
-    `${clip.rise !== 1 ? `, rise x${clip.rise}` : ''}   [${clip.from}]`);
+  const out = join(outDir, `${character}-rigged.glb`);
+  writeFileSync(out, Buffer.from(result.base64, 'base64'));
+
+  console.log(`\n${character} -> assets/models/${character}-rigged.glb`);
+  console.log(`  ${(readFileSync(out).length / 1048576).toFixed(1)} MB, ${result.report.length} clips`);
+  console.log(`  rest pose: ${result.size.y.toFixed(3)} tall, feet at y=${result.min.y.toFixed(3)}`);
+  console.log(`  textures: ${result.textures.join(', ') || 'none'} (written as WebP)`);
+  console.log(`  suggested "scale": ${(1 / result.size.y).toFixed(3)}  (to stand one unit tall)`);
+  for (const clip of result.report) {
+    console.log(`    ${clip.state.padEnd(10)} ${String(clip.seconds).padStart(6)}s  ` +
+      `${clip.rootTracksFlattened} root flattened` +
+      `${clip.rise !== 1 ? `, rise x${clip.rise}` : ''}   [${clip.from}]`);
+  }
+
+  await page.close();
 }
 
 await browser.close();
