@@ -154,6 +154,10 @@ export function createActor(spec, gltf) {
       if (wanted && clip.duration > 0) action.setEffectiveTimeScale(clip.duration / wanted);
       else if (config.speed) action.setEffectiveTimeScale(config.speed);
 
+      // Locomotion is the exception: its speed is not fixed, it follows how
+      // fast the character is actually travelling, or the feet skate.
+      if (state === 'walk') action.userData = { gait: config.gait || 1 };
+
       actions[state] = action;
     }
 
@@ -217,7 +221,20 @@ export function createActor(spec, gltf) {
      */
     update(dt, speed = 0) {
       stateTime += dt;
-      if (mixer) { mixer.update(dt); return; }
+      if (mixer) {
+        /*
+         * Tie the gait to the ground speed. A walk cycle played at a fixed
+         * rate while the character moves at a different one is the classic
+         * skating look, and it is the first thing anyone notices.
+         */
+        const gait = actions && actions.walk;
+        if (gait && state === 'walk') {
+          const base = (gait.userData && gait.userData.gait) || 1;
+          gait.setEffectiveTimeScale(base * Math.max(0.35, speed));
+        }
+        mixer.update(dt);
+        return;
+      }
       if (!parts) return;
 
       phase += dt * (4 + speed * 6);

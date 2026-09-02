@@ -39,17 +39,36 @@ const NAMING = [
   { match: /Prep_Straight_Punch/i, name: 'punch' },
   { match: /Right_Straight_Kick/i, name: 'kick' },
   { match: /Step_Knee_Strike/i, name: 'knee' },
-  { match: /Hit_Reaction/i, name: 'hit' },
-  { match: /Jump_Over_Obstacle/i, name: 'jump' },
-  { match: /Idle|Guard_Idle/i, name: 'idle' },
-  { match: /Walk|Run/i, name: 'walk' },
-  { match: /Death|Knock|Fall/i, name: 'down' }
+  // Order matters below: BeHit_FlyUp is a knockdown, and would otherwise be
+  // caught by the /Hit/ rule meant for the standing flinch.
+  { match: /BeHit_FlyUp|Death|Knock|Fall/i, name: 'down' },
+  { match: /Hit_Reaction|BeHit/i, name: 'hit' },
+  { match: /Jump_Over_Obstacle/i, name: 'hurdle' },
+  { match: /Back_Jump/i, name: 'backjump' },
+  { match: /Regular_Jump|^.*Jump/i, name: 'jump' },
+  { match: /Running|Run(?!g)/i, name: 'run' },
+  { match: /Walking|Walk/i, name: 'walk' },
+  { match: /Idle|Guard_Idle/i, name: 'idle' }
 ];
 
 function clipNameFor(file) {
   const found = NAMING.find((rule) => rule.match.test(file));
   return found ? found.name : null;
 }
+
+/*
+ * How much of a clip's upward root motion to keep.
+ *
+ * BeHit_FlyUp does what its name says: the hips go from a standing 67 up to
+ * 209, about three body heights, and the character leaves the top of a fixed
+ * camera entirely. A knockdown nobody can see is worse than no knockdown, so
+ * the launch is compressed to something that still pops but stays in frame.
+ *
+ * Only motion *above* where the clip started is scaled. The end of that clip
+ * has the hips at 7, lying on the ground, and scaling that toward the standing
+ * height would leave the character floating above the floor it just hit.
+ */
+const ROOT_RISE = { down: 0.3 };
 
 const files = readdirSync(inbox).filter((f) => f.toLowerCase().endsWith('.glb')).sort();
 if (!files.length) {
@@ -75,7 +94,7 @@ const browser = await chromium.launch({
 const page = await browser.newPage();
 await page.addScriptTag({ content: readFileSync(join(root, 'dist/merge-deps.js'), 'utf8') });
 
-const result = await page.evaluate(async (inputs) => {
+const result = await page.evaluate(async ({ inputs, riseFor }) => {
   const { GLTFLoader, GLTFExporter, THREE } = globalThis.__mergeDeps;
   const loader = new GLTFLoader();
 
@@ -112,14 +131,18 @@ const result = await page.evaluate(async (inputs) => {
       });
 
       let stripped = 0;
+      const rise = riseFor[clip.name] != null ? riseFor[clip.name] : 1;
       for (const track of clip.tracks) {
         const [nodeName, property] = track.name.split('.');
         if (property !== 'position' || !rootNames.has(nodeName)) continue;
         const values = track.values;
-        const x0 = values[0], z0 = values[2];
+        const x0 = values[0], y0 = values[1], z0 = values[2];
         for (let i = 0; i < values.length; i += 3) {
           values[i] = x0;         // hold X where the clip started
-          values[i + 2] = z0;     // and Z; Y is left alone so a jump still rises
+          values[i + 2] = z0;     // and Z; Y is what makes a jump leave the ground
+          if (rise !== 1 && values[i + 1] > y0) {
+            values[i + 1] = y0 + (values[i + 1] - y0) * rise;
+          }
         }
         stripped++;
       }
@@ -130,7 +153,8 @@ const result = await page.evaluate(async (inputs) => {
         from: original,
         seconds: Number(clip.duration.toFixed(3)),
         tracks: clip.tracks.length,
-        rootTracksFlattened: stripped
+        rootTracksFlattened: stripped,
+        rise
       });
     }
   }
@@ -201,7 +225,7 @@ const result = await page.evaluate(async (inputs) => {
     size: { x: size.x, y: size.y, z: size.z },
     min: { x: box.min.x, y: box.min.y, z: box.min.z }
   };
-}, payload);
+}, { inputs: payload, riseFor: ROOT_RISE });
 
 mkdirSync(outDir, { recursive: true });
 const out = join(outDir, 'niulai-rigged.glb');
@@ -214,7 +238,8 @@ console.log(`  textures: ${result.textures.join(', ') || 'none'} (written as Web
 console.log(`  suggested "scale": ${(1 / result.size.y).toFixed(3)}  (to stand one unit tall)\n`);
 for (const clip of result.report) {
   console.log(`  ${clip.state.padEnd(8)} ${String(clip.seconds).padStart(6)}s  ` +
-    `${clip.tracks} tracks, ${clip.rootTracksFlattened} root track(s) flattened   [${clip.from}]`);
+    `${clip.tracks} tracks, ${clip.rootTracksFlattened} root flattened` +
+    `${clip.rise !== 1 ? `, rise x${clip.rise}` : ''}   [${clip.from}]`);
 }
 
 await browser.close();

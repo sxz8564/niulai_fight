@@ -84,11 +84,22 @@ const played = await page.evaluate(() => {
   api.release('right');
   const wolf = api.game.enemies[0];
   if (!wolf) return { walked, punched: false };
-  wolf.root.position.set(api.game.player.position.x + 0.6, 0, api.game.player.position.z);
-  api.game.player.facing = 1;
+
+  // Put both fighters in a known state first. Six seconds of walking leaves
+  // whatever it leaves — a stunned wolf, a player mid-swing — and a punch
+  // check that starts from "whatever happened" measures the weather.
+  const player = api.game.player;
+  player.health = player.maxHealth;
+  player.dead = false;
+  player.downTimer = 0; player.stunTimer = 0; player.attackTimer = 0;
+  player.facing = 1;
+  wolf.root.position.set(player.position.x + 0.6, 0, player.position.z);
+  wolf.stunTimer = 0; wolf.downTimer = 0; wolf.attackTimer = 0;
+  wolf.invulnerable = 0; wolf.dead = false; wolf.health = wolf.maxHealth;
+
   const before = wolf.health;
   api.press('punch');
-  api.step(0.5);
+  api.step(player.timings.punch + 0.2);
   return { walked, punched: wolf.health < before };
 });
 check('the player walks and wolves appear', played.walked.x > 3 && played.walked.enemies > 0,

@@ -120,8 +120,9 @@ const punch = await api(() => {
   wolf.stunTimer = 0; wolf.attackTimer = 0;
   g.player.facing = 1;
   const before = wolf.health;
+  const swing = g.player.timings.punch + 0.2;
   globalThis.__niulaiFight.press('punch');
-  globalThis.__niulaiFight.step(0.5);
+  globalThis.__niulaiFight.step(swing);
   return { before, after: wolf.health, dead: wolf.dead };
 });
 check('a punch damages a wolf', punch.after < punch.before, `${punch.before} -> ${punch.after}`);
@@ -130,15 +131,16 @@ check('a punch damages a wolf', punch.after < punch.before, `${punch.before} -> 
 const killed = await api(() => {
   const g = globalThis.__niulaiFight.game;
   const before = g.enemies.length;
+  const step = g.player.timings.punch + 0.2;
   for (let swing = 0; swing < 24 && g.enemies.length >= before; swing++) {
     const wolf = g.enemies[0];
     if (!wolf) break;
-    if (wolf.downTimer > 0 || wolf.health <= 0) { globalThis.__niulaiFight.step(0.45); continue; }
+    if (wolf.downTimer > 0 || wolf.health <= 0) { globalThis.__niulaiFight.step(step); continue; }
     wolf.root.position.set(g.player.position.x + 0.6, 0, g.player.position.z);
     wolf.stunTimer = 0;
     g.player.facing = 1;
     globalThis.__niulaiFight.press('punch');
-    globalThis.__niulaiFight.step(0.45);
+    globalThis.__niulaiFight.step(step);
   }
   return { before, after: g.enemies.length, score: g.score };
 });
@@ -149,6 +151,20 @@ check('killing scores points', killed.score > 0, `${killed.score}`);
 /* Wolves have to be dangerous, or there is no game. */
 const hurt = await api(() => {
   const g = globalThis.__niulaiFight.game;
+
+  /*
+   * Stand the player back up first. By this point the earlier checks have had
+   * wolves swinging at him for a while and he may already be on the floor — in
+   * which case `before` is zero, the respawn puts it back to full, and the
+   * check reads a resurrection as a wound. Establish the precondition rather
+   * than hoping for it.
+   */
+  g.player.health = g.player.maxHealth;
+  g.player.dead = false;
+  g.player.downTimer = 0;
+  g.player.stunTimer = 0;
+  g.player.actor.play('idle');
+
   const before = g.player.health;
   g.player.invulnerable = 0;
   for (let i = 0; i < 40 && g.player.health === before; i++) {
@@ -189,9 +205,10 @@ const depth = await api(() => {
   // Level in Z: should connect.
   wolf.root.position.set(g.player.position.x + 0.6, 0, g.player.position.z);
   wolf.health = 34; wolf.dead = false; wolf.downTimer = 0; wolf.stunTimer = 0;
+  const swing = g.player.timings.punch + 0.2;
   const levelBefore = wolf.health;
   globalThis.__niulaiFight.press('punch');
-  globalThis.__niulaiFight.step(0.5);
+  globalThis.__niulaiFight.step(swing);
   const levelHit = wolf.health < levelBefore;
 
   // A metre upstage: should miss.
@@ -199,7 +216,7 @@ const depth = await api(() => {
   wolf.health = 34; wolf.dead = false; wolf.downTimer = 0; wolf.stunTimer = 0;
   const apartBefore = wolf.health;
   globalThis.__niulaiFight.press('punch');
-  globalThis.__niulaiFight.step(0.5);
+  globalThis.__niulaiFight.step(swing);
   const apartHit = wolf.health < apartBefore;
 
   return { levelHit, apartHit };

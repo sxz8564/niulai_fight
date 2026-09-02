@@ -41,14 +41,16 @@ npm run serve      # then open the printed address
 
 ## The characters
 
-**Niulai is rigged.** He is a full skinned biped with five motion-captured
-clips — punch, kick, knee, hit reaction, jump — merged into one
-`assets/models/niulai-rigged.glb` by `npm run models`.
+**Niulai is rigged**, with ten clips merged into one
+`assets/models/niulai-rigged.glb` by `npm run models`: punch, kick, knee, hit,
+knockdown, walk, run, and three flavours of jump. Every state the game asks for
+now has a real animation behind it.
 
-Two of the six states have not been delivered yet, and the registry says so out
-loud: `walk` falls back to the guard-stance idle, so he slides rather than
-strides, and `down` falls back to the hit reaction, so a knockdown reads as a
-flinch. Neither is the game failing; both go away when the clips arrive.
+Locomotion uses the **run** cycle rather than the walk one, because the player
+covers about four body-heights a second, and its speed follows the character's
+actual ground speed so the feet do not skate. The walk cycle is in the file for
+slower characters. Three clips — walk, hurdle, back-jump — are merged and
+trimmed but not yet bound to anything; jumping needs an air state first.
 
 **Wolfwolf is still a head on a placeholder body**, built from primitives and
 animated by rotating them — the wolf model is the one from the

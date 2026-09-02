@@ -247,6 +247,20 @@ export class Game {
     }
     clampToBelt(this.player.position);
     for (const enemy of this.enemies) clampToBelt(enemy.position);
+
+    /*
+     * The gate has to hold against everything, not just walking into it.
+     * drivePlayer stops the player steering past the boundary, but a shove
+     * from a wolf and the knockback from a hit both move the player
+     * afterwards and neither goes through that check — so the player could be
+     * pushed through the one wall the whole level structure depends on.
+     * Clamping here, after everything that can move anyone, is the only place
+     * that holds.
+     */
+    if (this.player.position.x > this.boundary) {
+      this.player.position.x = this.boundary;
+      if (this.player.velocity.x > 0) this.player.velocity.x = 0;
+    }
   }
 
   cull() {
