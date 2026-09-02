@@ -23,5 +23,20 @@
     "file": "confirm.webm",
     "volume": 0.5,
     "voices": 1
+  },
+  "charge": {
+    "file": "charge.webm",
+    "volume": 0.55,
+    "voices": 1
+  },
+  "win": {
+    "file": "win.webm",
+    "volume": 0.6,
+    "voices": 1
+  },
+  "loss": {
+    "file": "loss.webm",
+    "volume": 0.6,
+    "voices": 1
   }
 }

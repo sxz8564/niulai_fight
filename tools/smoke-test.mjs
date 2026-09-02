@@ -1283,6 +1283,70 @@ check('a wolf hitting the player makes neither',
 check('a body going down thuds', heard.knockdown.includes('fall'),
   heard.knockdown.join(', ') || 'silence');
 
+/*
+ * And the three that are about the shape of a run rather than a hit: the Cart
+ * spooling up, and the two endings.
+ *
+ * The engine starts with the wind-up, not with the charge. The pause is the
+ * only warning the move gives, and a warning you can hear reaches a player who
+ * is busy with a wolf — which is exactly the player who is about to be run
+ * over. Its file is trimmed to peak where the charge lands rather than four
+ * seconds later, which is what the whole 4.8-second source would have done.
+ */
+const bigMoments = await api(() => {
+  const g = globalThis.__niulaiFight.game;
+  const log = [];
+  const real = g.sounds.play.bind(g.sounds);
+  g.sounds.play = (name) => { log.push(name); return true; };
+  const take = () => { const copy = log.slice(); log.length = 0; return copy; };
+
+  const boss = globalThis.__toBoss();
+  take();
+  boss.enter('wind');
+  const winding = take();
+  boss.enter('charge');
+  const charging = take();
+  boss.enter('recover');
+  const recovering = take();
+
+  // The last life.
+  g.lives = 1;
+  g.over = false;
+  g.player.health = 0; g.player.dead = true; g.player.downTimer = 0;
+  g.loseLife();
+  const losing = take();
+
+  // And winning.
+  g.over = false; g.won = false;
+  g.player.dead = false; g.player.health = g.player.maxHealth; g.player.downTimer = 0;
+  g.celebrate();
+  const winning = take();
+
+  g.sounds.play = real;
+
+  // Put it back the way the checks after this one expect to find it.
+  g.over = false; g.won = false; g.lives = 3;
+  g.gateIndex = 0;
+  for (const gate of g.gates) gate.opened = false;
+  for (const enemy of g.enemies) g.scene.remove(enemy.root);
+  g.enemies = []; g.boss = null; g.spawnQueue = 0;
+  g.power.clear();
+  g.power.meter = 0;
+  g.player.position.set(0, 0, 0.2);
+  g.player.pose = null;
+  g.player.actor.play('idle');
+  return { winding, charging, recovering, losing, winning };
+});
+check('the Cart\'s engine starts with the wind-up, which is the warning',
+  bigMoments.winding.join() === 'charge', bigMoments.winding.join(', ') || 'silence');
+check('and not again when it actually charges or stalls',
+  bigMoments.charging.length === 0 && bigMoments.recovering.length === 0,
+  [...bigMoments.charging, ...bigMoments.recovering].join(', ') || 'silence');
+check('running out of lives sounds like losing',
+  bigMoments.losing.join() === 'loss', bigMoments.losing.join(', ') || 'silence');
+check('and clearing the last stage sounds like winning',
+  bigMoments.winning.join() === 'win', bigMoments.winning.join(', ') || 'silence');
+
 /* ------------------------------------------------------------ the ending --
  *
  * Winning used to stop the frame. That is right for a loss — the player is on

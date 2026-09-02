@@ -423,7 +423,15 @@ export class Game {
     });
     this.enemies.push(fighter);
     this.bossSpec = spec;
-    this.boss = new Boss(fighter, { min: gate.x - 15, max: gate.x + 4 });
+    /*
+     * The engine starts with the wind-up, not with the charge. The pause is the
+     * only warning the move gives, and a warning you can hear is worth more
+     * than one you have to be looking at — the whole point of the second is
+     * that it reaches a player who is busy with a wolf.
+     */
+    this.boss = new Boss(fighter, { min: gate.x - 15, max: gate.x + 4 }, (phase) => {
+      if (phase === 'wind') this.sounds.play('charge');
+    });
     return this.boss;
   }
 
@@ -452,6 +460,7 @@ export class Game {
     // A character with no celebration keeps its idle rather than freezing in
     // whatever pose the last punch left it in.
     p.actor.play(p.actor.has('win') ? 'win' : 'idle');
+    this.sounds.play('win');
     this.cheerTime = 0;
   }
 
@@ -489,6 +498,7 @@ export class Game {
     if (this.lives <= 0) {
       this.over = true;
       this.won = false;
+      this.sounds.play('loss');
       this.onState(this.snapshot());
       return;
     }

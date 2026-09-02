@@ -56,6 +56,8 @@ library — for a handful of impacts that is the whole job.
 | --- | --- |
 | **punch**, **kick** | the player's, on contact |
 | **fall** | anything knocked down, hero, wolf or Cart |
+| **charge** | the Cart's engine, on the wind-up |
+| **win**, **loss** | the two ways a run ends |
 | **select**, **confirm** | moving across the roster, and choosing |
 
 **Punches and kicks are the player's only.** The wolves throwing the same sound
@@ -67,7 +69,17 @@ invulnerability ate is a smaller one.
 
 The knockdown is a hook on the Fighter rather than four call sites in the game.
 Punches, a charge and a stampede all arrive through `takeHit` and all end the
-same way, so the sound belongs where they meet.
+same way, so the sound belongs where they meet. The Cart has the same
+arrangement for its phases.
+
+**The engine starts with the wind-up, not with the charge.** The pause is the
+only warning the move gives, and a warning you can hear reaches a player who is
+busy with a wolf — which is exactly the player who is about to be run over. The
+source is 4.8 seconds of a truck getting steadily louder, peaking right at the
+end, so playing it whole would have put its loudest moment four seconds after
+the charge, during the stall, which is the quietest thing that happens in the
+fight. It ships as the last 1.45 seconds of that build, which lands its peak on
+the charge.
 
 Each sound gets a few `<audio>` elements played round robin. One element per
 sound cuts itself off, so two punches a tenth of a second apart become one
@@ -82,7 +94,7 @@ listening, since a muted test machine would answer no to everything.
 
 Everything is Opus in WebM, including the sources that arrived as Ogg Vorbis and
 24-bit WAV: one format the whole toolchain and both test suites already know how
-to check, and 404 KB of audio becomes 40.
+to check.
 
 ```bash
 ffmpeg -i in.wav -vn -c:a libopus -b:a 64k -ar 48000 assets/audio/out.webm

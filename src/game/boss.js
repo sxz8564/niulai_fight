@@ -40,10 +40,12 @@ export class Boss {
   /**
    * @param {import('./fighter.js').Fighter} fighter the body it drives
    * @param {{min: number, max: number}} arena how far it may travel in X
+   * @param {(phase: string) => void} [onPhase] told each time it changes phase
    */
-  constructor(fighter, arena) {
+  constructor(fighter, arena, onPhase) {
     this.fighter = fighter;
     this.arena = arena;
+    this.onPhase = onPhase || null;
     this.phase = 'stalk';
     this.timer = COOLDOWN;
     this.chargeDir = -1;
@@ -58,6 +60,7 @@ export class Boss {
     this.phase = phase;
     this.timer = { stalk: COOLDOWN, wind: WIND_TIME, charge: CHARGE_TIMEOUT, recover: RECOVER_TIME }[phase];
     this.fighter.vulnerability = phase === 'recover' ? PUNISH : 1;
+    if (this.onPhase) this.onPhase(phase);
   }
 
   update(dt, player) {
