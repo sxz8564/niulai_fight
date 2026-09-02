@@ -84,6 +84,7 @@ const heads = await api(() => {
 });
 check('both character models load', heads.gltfs.includes('niulai') && heads.gltfs.includes('wolfwolf'),
   heads.gltfs.join(', '));
+check('the boss model loads', heads.gltfs.includes('cart'), heads.gltfs.join(', '));
 
 // The picture must contain something other than sky.
 async function pixelVariety() {
@@ -362,6 +363,268 @@ const cost = await api(() => {
 check('you cannot walk while blocking', cost.movedWhileBlocking < 0.05,
   `moved ${cost.movedWhileBlocking.toFixed(3)}`);
 check('you cannot swing while blocking', !cost.attackedWhileBlocking);
+
+
+/* ---------------------------------------------------------------- the boss --
+ *
+ * The Cart is a different question from the wolves, and every check below is
+ * that question from a different side: is its one attack answerable? A charge
+ * you cannot see coming, cannot step out of the way of, or cannot punish is not
+ * a boss fight, it is a damage tax.
+ */
+
+/* Puts the game at the last gate with the Cart on the field and nothing else,
+ * so what follows measures the boss rather than whichever wolf wandered in. */
+await api(() => {
+  globalThis.__toBoss = () => {
+    const g = globalThis.__niulaiFight.game;
+    for (let i = 0; i < g.gates.length - 1; i++) g.gates[i].opened = true;
+    g.gateIndex = g.gates.length - 1;
+    const gate = g.gates[g.gateIndex];
+    gate.opened = false;
+    for (const e of g.enemies) g.scene.remove(e.root);
+    g.enemies = [];
+    g.boss = null;
+    g.spawnQueue = 0;
+    g.over = false; g.won = false; g.lives = 3;
+    g.player.position.set(gate.x - 5, 0, 0.2);
+    g.player.health = g.player.maxHealth;
+    g.player.dead = false; g.player.downTimer = 0; g.player.stunTimer = 0;
+    g.player.attackTimer = 0; g.player.invulnerable = 0; g.player.blocking = false;
+    g.buffered = null;
+
+    globalThis.__niulaiFight.step(0.2);   // the gate opens and the Cart rolls in
+    g.spawnQueue = 0;                     // its escort would only muddy a measurement
+    for (const e of g.enemies) if (!g.boss || e !== g.boss.fighter) g.scene.remove(e.root);
+    g.enemies = g.enemies.filter((e) => g.boss && e === g.boss.fighter);
+    return g.boss;
+  };
+
+  /* One charge, start to finish, with the player placed and posed by the
+   * caller. Returns what it cost them. */
+  globalThis.__oneCharge = ({ lane = 0, blocking = false, facing = 1 } = {}) => {
+    const g = globalThis.__niulaiFight.game;
+    const b = g.boss;
+    const f = b.fighter;
+    f.position.set(g.player.position.x + 3.4, 0, 0);
+    g.player.position.z = lane;
+    g.player.health = g.player.maxHealth;
+    g.player.dead = false; g.player.downTimer = 0; g.player.stunTimer = 0;
+    g.player.invulnerable = 0;
+    g.player.facing = facing;
+    if (blocking) globalThis.__niulaiFight.press('block');
+    b.enter('wind');
+    const before = g.player.health;
+    for (let t = 0; t < 40 && b.phase !== 'recover'; t++) {
+      g.player.facing = facing;          // held: the charge is what is being measured
+      globalThis.__niulaiFight.step(0.1);
+    }
+    if (blocking) globalThis.__niulaiFight.release('block');
+    return { before, after: g.player.health, cost: before - g.player.health };
+  };
+});
+
+const bossArrived = await api(() => {
+  const g = globalThis.__niulaiFight.game;
+  const boss = globalThis.__toBoss();
+  let mesh = null;
+  boss.fighter.root.traverse((node) => { if (node.isMesh) mesh = mesh || node; });
+  return {
+    lastGateIsBoss: !!g.gates[g.gates.length - 1].boss,
+    spawned: !!boss,
+    phase: boss.phase,
+    health: boss.fighter.health,
+    counted: g.enemies.includes(boss.fighter),
+    hasABody: !!mesh,
+    hurtRadius: boss.fighter.hurtRadius
+  };
+});
+check('the last stage is a boss stage', bossArrived.lastGateIsBoss);
+check('the Cart rolls in at the last gate', bossArrived.spawned && bossArrived.health > 0,
+  `${bossArrived.health} hp, ${bossArrived.phase}`);
+check('the boss counts as an enemy, so the gate cannot open past it', bossArrived.counted);
+check('the boss has a body', bossArrived.hasABody);
+await api(() => globalThis.__niulaiFight.step(0.6));
+await page.screenshot({ path: join(shots, '4-boss.png') });
+
+/*
+ * The wind-up. This is the whole fight: a second of standing still is the only
+ * warning the charge gives, and if it ever moves during it the tell is a lie.
+ */
+const tell = await api(() => {
+  const g = globalThis.__niulaiFight.game;
+  const b = g.boss;
+  b.enter('wind');
+  const startX = b.fighter.position.x;
+  globalThis.__niulaiFight.step(0.8);
+  const stillWinding = b.phase === 'wind';
+  const drifted = Math.abs(b.fighter.position.x - startX);
+  const pose = b.fighter.pose;
+  globalThis.__niulaiFight.step(0.4);
+  return { stillWinding, drifted, pose, then: b.phase };
+});
+check('the boss pauses before it charges', tell.stillWinding && tell.then === 'charge',
+  `${tell.pose} for a second, then ${tell.then}`);
+check('and does not move an inch while it winds up', tell.drifted < 0.02,
+  `drifted ${tell.drifted.toFixed(4)}`);
+
+/*
+ * The charge is a straight line. Not a simplification — it is the reason the
+ * fight has an answer: it commits to a lane, so stepping off that lane is the
+ * dodge. A charge that tracked the player in Z would be unavoidable.
+ */
+const line = await api(() => {
+  const g = globalThis.__niulaiFight.game;
+  const b = g.boss;
+  const f = b.fighter;
+  f.position.set(g.player.position.x + 3.5, 0, 0);
+  g.player.position.z = 1.2;         // well off the line, and it must not follow
+  b.enter('wind');
+  globalThis.__niulaiFight.step(1.05);
+  const z0 = f.position.z;
+  const x0 = f.position.x;
+  globalThis.__niulaiFight.step(0.3);
+  const chargeSpeed = Math.abs(f.position.x - x0) / 0.3;
+  // Read now, not at the return. Stalking steers in Z on purpose, so measuring
+  // the drift after the comparison below reads the wrong phase entirely — which
+  // is exactly what this check did on its first run, and it failed the game for
+  // doing the right thing.
+  const drift = Math.abs(f.position.z - z0);
+  const phase = b.phase;
+
+  // What it manages in the same time while merely stalking, for comparison.
+  b.enter('stalk');
+  b.timer = 99;                      // stalking, not lining up for another one
+  const x1 = f.position.x;
+  globalThis.__niulaiFight.step(0.3);
+  const stalkSpeed = Math.abs(f.position.x - x1) / 0.3;
+
+  return { drift, phase, chargeSpeed, stalkSpeed };
+});
+check('the charge holds its lane', line.phase === 'charge' && line.drift < 0.02,
+  `${line.phase}, drifted ${line.drift.toFixed(4)} in Z`);
+check('the charge is much faster than it rolls', line.chargeSpeed > line.stalkSpeed * 3,
+  `${line.chargeSpeed.toFixed(1)} vs ${line.stalkSpeed.toFixed(1)} units/s`);
+
+/* Standing in the way must hurt, and hurt properly — a boss whose attack costs
+ * what a wolf's does is a wolf. */
+const ran = await api(() => globalThis.__oneCharge({ lane: 0 }));
+const wolfDamage = await api(() => 8);
+check('being run over costs a lot of health', ran.cost > wolfDamage * 3,
+  `${ran.cost.toFixed(0)} against a wolf's ${wolfDamage}`);
+
+/* And stepping off the line must cost nothing at all. This is the payoff for
+ * the third axis: a player can finish the first four stages without ever
+ * needing it, and cannot finish this one without it. */
+const dodged = await api(() => globalThis.__oneCharge({ lane: 1.25 }));
+check('stepping off the line dodges the charge completely', dodged.cost === 0,
+  `${dodged.cost.toFixed(0)} damage taken`);
+
+/* Blocking is the other answer, and a worse one — it costs you a share of the
+ * damage where moving costs nothing. */
+const guarded = await api(() => globalThis.__oneCharge({ lane: 0, blocking: true, facing: 1 }));
+check('blocking into the charge cuts the damage', guarded.cost > 0 && guarded.cost < ran.cost,
+  `${guarded.cost.toFixed(1)} blocked against ${ran.cost.toFixed(0)} unguarded`);
+
+/*
+ * It has to be reachable. The Cart is nearly three units long, so a hit box
+ * measured centre to centre — which is how every other fighter is measured —
+ * puts its middle further away than an arm can reach while its bodywork is in
+ * the player's face. Without hurtRadius it is literally unhittable, and nothing
+ * else here would notice: it would simply never lose a fight.
+ */
+const reached = await api(() => {
+  const g = globalThis.__niulaiFight.game;
+  const f = g.boss.fighter;
+  f.position.set(g.player.position.x + 1.7, 0, g.player.position.z);   // past REACH_X
+  g.boss.enter('stalk');
+  g.boss.timer = 99;
+  f.health = f.maxHealth;
+  f.invulnerable = 0;
+  g.player.facing = 1;
+  g.player.attackTimer = 0; g.player.stunTimer = 0; g.player.blocking = false;
+  g.buffered = null;
+  const before = f.health;
+  globalThis.__niulaiFight.press('punch');
+  globalThis.__niulaiFight.step(g.player.timings.punch + 0.2);
+  return { before, after: f.health, gap: 1.7 };
+});
+check('a punch can reach the boss at all', reached.after < reached.before,
+  `${reached.before} -> ${reached.after} from ${reached.gap} away`);
+
+/*
+ * The punish window. An attack with no recovery has no counterplay, so the
+ * stall after a charge is where the fight is actually won — and it is worth
+ * more than hitting it any other time.
+ */
+const punish = await api(() => {
+  const g = globalThis.__niulaiFight.game;
+  const f = g.boss.fighter;
+  const bite = () => {
+    f.health = f.maxHealth;
+    f.invulnerable = 0;
+    f.takeHit(10, 1);
+    return f.maxHealth - f.health;
+  };
+  g.boss.enter('stalk');
+  const rolling = bite();
+  g.boss.enter('recover');
+  const stalled = bite();
+  g.boss.enter('stalk');
+  return { rolling, stalled };
+});
+check('the boss takes more damage while it is stalled', punish.stalled > punish.rolling,
+  `${punish.stalled} in recovery against ${punish.rolling} while rolling`);
+
+/* Armour: a jab must not stop two tonnes. Otherwise the whole fight collapses
+ * into mashing punch and never moving. */
+const armour = await api(() => {
+  const g = globalThis.__niulaiFight.game;
+  const b = g.boss;
+  const f = b.fighter;
+  f.position.set(g.player.position.x + 3.4, 0, 0);
+  f.health = f.maxHealth;
+  b.enter('wind');
+  globalThis.__niulaiFight.step(1.05);
+  const chargingBefore = b.phase;
+  f.invulnerable = 0;
+  f.takeHit(12, -1);
+  globalThis.__niulaiFight.step(0.1);
+  return { chargingBefore, phase: b.phase, stun: f.stunTimer, hurt: f.maxHealth - f.health };
+});
+check('a punch hurts the boss without stopping the charge',
+  armour.chargingBefore === 'charge' && armour.phase === 'charge' && armour.stun === 0 && armour.hurt > 0,
+  `${armour.hurt} damage, still ${armour.phase}, ${armour.stun}s of stun`);
+
+/* And finally: killing it has to end the level. */
+const finished = await api(() => {
+  const g = globalThis.__niulaiFight.game;
+  const f = g.boss.fighter;
+  g.boss.enter('stalk');
+  f.invulnerable = 0;
+  f.takeHit(f.health, 1);
+  const wrecked = f.downTimer > 0;
+  globalThis.__niulaiFight.step(4);
+  const snap = g.snapshot();
+  return { wrecked, over: snap.over, won: snap.won, enemies: snap.enemies, boss: snap.boss };
+});
+check('the boss goes down rather than vanishing', finished.wrecked);
+check('wrecking the boss wins the game', finished.over && finished.won,
+  `over=${finished.over} won=${finished.won}`);
+check('the boss bar goes away with the boss', finished.boss === null);
+
+/* Back to a clean game for the checks that follow. */
+await api(() => {
+  const g = globalThis.__niulaiFight.game;
+  g.over = false; g.won = false;
+  g.gateIndex = 0;
+  for (const gate of g.gates) gate.opened = false;
+  for (const e of g.enemies) g.scene.remove(e.root);
+  g.enemies = []; g.boss = null; g.spawnQueue = 0;
+  g.player.position.set(0, 0, 0.2);
+  g.player.health = g.player.maxHealth;
+  g.player.dead = false; g.player.downTimer = 0; g.player.stunTimer = 0;
+});
 
 /*
  * Baola is the other hero. Loading her is the check that a second playable

@@ -3,13 +3,15 @@
 A belt-scrolling brawler in the shape of the Famicom ones: walk right, the
 screen stops, wolves arrive, clear them, the screen lets you on. Two fighters
 to pick from — Niulai 牛来 and Baola 豹拉 — against Wolfwolf, who comes in
-packs, through woods and grassland.
+packs, through woods and grassland, and the Cart 木车 waiting at the end of it.
 
 Runs as a Chrome extension. Click the toolbar button and it opens in a tab.
 
 ![The character select: Niulai and Baola](docs/select.png)
 
 ![Baola between two wolves in the woods](docs/screenshot.png)
+
+![The Cart rearing back to charge](docs/boss.png)
 
 ## Playing it
 
@@ -40,6 +42,30 @@ Stepping up and down is not decoration. An attack only lands if you are close
 in X *and* nearly level in Z, so a wolf standing a metre upstage cannot hit you
 and you cannot hit it. Circling is how you fight three at once.
 
+## The Cart
+
+The fifth stage is not more wolves. **The Cart 木车** rolls in with two of them,
+and it has exactly one attack:
+
+1. It follows you, slowly. Too slowly to catch anyone who keeps moving — it is
+   not trying to catch you, it is trying to line you up.
+2. It stops dead for **one second**, rears its nose up and shakes.
+3. It charges straight down the belt at six times its rolling speed, and being
+   hit costs a third of your health.
+4. It overshoots, stalls for a second and a half, and takes **double damage**
+   while it does.
+
+That loop is the whole fight, and every part of it is there to make the attack
+answerable. The charge holds the lane it committed to during the wind-up, so
+the answer is to step off that line — the third axis the first four stages let
+you ignore. Blocking works too and costs you a fifth of the damage, where
+moving costs nothing. The stall afterwards is the only window worth punching
+in, so the fight is a rhythm rather than a race.
+
+It does not flinch. A punch hurts it without stopping it, because a boss a jab
+could halt would make the whole thing a matter of mashing one button and never
+moving.
+
 ## Installing it
 
 Clone it, then in Chrome: **chrome://extensions** → turn on **Developer mode**
@@ -66,15 +92,30 @@ npm run serve      # then open the printed address
 
 ## The characters
 
-**All three characters are rigged bipeds.** `npm run models` reads one folder
+**The three fighters are rigged bipeds.** `npm run models` reads one folder
 per character under `incoming/` and writes a single `.glb` each — 11 clips for
 Niulai and Baola, 10 for Wolfwolf, around a megabyte apiece.
+
+**The Cart is not.** It arrived as one static mesh with no rig and no clips at
+all, which for a vehicle is not a shortcoming: its entire vocabulary is pitch,
+roll and shake, and those are three lines each. `npm run prop` brings a model
+like that in — re-encoding its textures, standing it on the floor and measuring
+it — and `updateProp` in `actor.js` writes the motion. It still goes through
+the same `play()` and `update()` as everything else, so nothing outside that
+file knows which kind of actor it got.
 
 Adding a fighter is a registry entry, not a code change: give it `playable:
 true`, its clip trims and its stats, and it appears on the select screen with a
 portrait rendered from the model itself. Baola went in that way, and reuses
 Niulai's trims unchanged — the clips came from the same generator with the same
 names, so the slices that worked for him work for her.
+
+A boss is a registry entry and a gate: `{ x, count, boss: 'cart' }` on the last
+gate is what puts it there. Its size lives in the registry too, and it matters
+more than it looks — the Cart is nearly three units long, so a hit box measured
+centre to centre, which is how every other fighter is measured, would put its
+middle further away than an arm can reach while its bodywork is in your face.
+`hurtRadius` is what makes it hittable at all.
 
 Locomotion speed follows actual ground speed, so nobody skates. Niulai uses the
 **run** cycle because he covers about four body-heights a second; the wolves,
@@ -105,6 +146,17 @@ screenshot. Between them they check that walking reaches a gate, that the gate
 holds you until the wave is dead, that a punch damages a wolf, that enough
 punches finish one, that a wolf can hurt you, that clearing opens the gate, and
 that a punch misses someone standing further up the belt.
+
+The boss gets its own set, and each one is the same question from a different
+side — is its one attack answerable? That it pauses before it charges and does
+not creep during the pause; that the charge holds its lane and is much faster
+than its roll; that standing in it costs a lot and stepping off it costs
+nothing; that blocking costs something in between; that a punch can reach it at
+all; that hitting it hurts without stopping it; that it takes more damage while
+stalled; and that wrecking it ends the game. Breaking any one of those on
+purpose fails exactly the checks that name it — including the unhittable-boss
+bug, which nothing else here would have noticed, because a boss that cannot be
+hit simply never loses.
 
 The extension suite exists separately because "works" and "works as an
 extension" fail differently: a manifest naming a missing file, an asset the

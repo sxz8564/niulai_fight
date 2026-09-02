@@ -32,6 +32,21 @@ export class Fighter {
     this.team = options.team;
     this.timings = { ...DEFAULT_TIMINGS, ...(options.timings || {}) };
 
+    /*
+     * Size and weight. A wolf and a two-tonne cart cannot share one number:
+     * the cart is wider than a punch's reach, so a hit box measured centre to
+     * centre would make it literally unhittable, and a shove that moves a wolf
+     * should not move a vehicle at all.
+     */
+    this.radius = options.radius ?? 0.22;        // half the space it occupies
+    this.hurtRadius = options.hurtRadius ?? 0;   // extra reach *onto* it
+    this.hurtDepth = options.hurtDepth ?? 0;     // how far across the belt it fills
+    this.knockback = options.knockback ?? 1;     // how far a hit shifts it
+    this.immovable = options.immovable ?? false; // whether a shove moves it
+    this.armored = options.armored ?? false;     // whether a hit interrupts it
+    this.vulnerability = 1;                      // damage multiplier, set per phase
+    this.pose = null;                            // overrides idle/walk when set
+
     this.velocity = new THREE.Vector3();
     this.attackTimer = 0;      // >0 while an attack is playing
     this.attackKind = null;
@@ -70,10 +85,18 @@ export class Fighter {
     return elapsed > total * 0.25 && elapsed < total * 0.7;
   }
 
+  /*
+   * Reach is measured to the target's edge, not its centre. Everything on the
+   * field used to be about the same size, so centre to centre was the same
+   * thing; a boss that is three times wider than a wolf is not, and measuring
+   * it the old way puts its centre further away than an arm can reach while
+   * its bodywork is in the player's face.
+   */
   inRange(other) {
     const dx = (other.position.x - this.position.x) * this.facing;
     const dz = Math.abs(other.position.z - this.position.z);
-    return dx > 0 && dx < REACH_X && dz < REACH_Z;
+    const edge = other.hurtRadius || 0;
+    return dx > 0 && dx < REACH_X + edge && dz < REACH_Z + edge * 0.5;
   }
 
   takeHit(damage, fromDirection) {
@@ -97,15 +120,27 @@ export class Fighter {
       return true;
     }
 
-    this.health -= damage;
+    this.health -= damage * this.vulnerability;
     this.invulnerable = 0.18;
-    this.velocity.x = fromDirection * 3.4;
+    this.velocity.x = fromDirection * 3.4 * this.knockback;
 
     if (this.health <= 0) {
       this.health = 0;
       this.downTimer = this.timings.down;
       this.actor.play('down');
-      this.velocity.x = fromDirection * 5.0;
+      this.velocity.x = fromDirection * 5.0 * this.knockback;
+      return true;
+    }
+
+    /*
+     * Armour: the hit lands and hurts, but does not stop what is already
+     * happening. A charging vehicle that a jab could halt would make the whole
+     * fight a matter of mashing punch at the right moment, and there would be
+     * no reason ever to move. The actor still jolts, so the player can see the
+     * damage they are doing.
+     */
+    if (this.armored) {
+      if (this.actor.jolt) this.actor.jolt();
       return true;
     }
     this.stunTimer = this.timings.hit;
@@ -154,20 +189,29 @@ export class Fighter {
     clampToBelt(this.position);
 
     this.actor.setFacing(this.facing);
-    this.actor.play(this.blocking ? 'block' : (moving ? 'walk' : 'idle'));
+    this.actor.play(this.pose || (this.blocking ? 'block' : (moving ? 'walk' : 'idle')));
     this.actor.update(dt, Math.min(1, this.velocity.length() / this.speed));
   }
 }
 
-/** Stops two fighters standing inside each other. */
-export function separate(a, b, radius = 0.44) {
+/**
+ * Stops two fighters standing inside each other.
+ *
+ * The gap they keep is the sum of their radii, so a big body takes up the room
+ * it looks like it takes up. An immovable one absorbs none of the push: walking
+ * into a cart moves you, not the cart.
+ */
+export function separate(a, b, radius) {
+  const gap = radius ?? ((a.radius ?? 0.22) + (b.radius ?? 0.22));
   const dx = b.position.x - a.position.x;
   const dz = (b.position.z - a.position.z) * 1.8;   // the belt is shallow
   const d2 = dx * dx + dz * dz;
-  if (d2 > radius * radius || d2 < 1e-6) return;
+  if (d2 > gap * gap || d2 < 1e-6) return;
+  if (a.immovable && b.immovable) return;
   const d = Math.sqrt(d2);
-  const push = (radius - d) / 2;
+  const overlap = gap - d;
   const nx = dx / d;
-  a.position.x -= nx * push;
-  b.position.x += nx * push;
+  const share = a.immovable ? 0 : (b.immovable ? 1 : 0.5);
+  a.position.x -= nx * overlap * share;
+  b.position.x += nx * overlap * (1 - share);
 }

@@ -25,8 +25,8 @@ and the only thing that survives is a silhouette.
 The line under the title in search results. End-user copy — plain words, no
 jargon. This lives in `manifest.json`.
 
-> A side-scrolling brawler in a browser tab. Pick a fighter, walk right, and
-> punch your way through five stages of wolves.
+> A side-scrolling brawler in a browser tab. Pick a fighter, walk right through
+> five stages of wolves, and face the Cart.
 
 ### Description
 
@@ -53,6 +53,14 @@ will see and do, not how it is built.
 > • Lose all your health and you go down. Lose three times and it is over, and
 >   one key starts you again.
 >
+> And at the end, the Cart 木车
+>
+> The last stage is not more wolves. The Cart follows you, stops dead for a
+> second to rear back and shake, and then charges straight down the field hard
+> enough to take a third of your health. It holds the line it picked, so the
+> answer is to step off it — and then to hit it while it is stalled, because
+> that is the only moment it cannot hit you back.
+>
 > No account, no sign-in, no internet
 >
 > The whole game is inside the extension. It asks for no permissions at all,
@@ -67,14 +75,16 @@ dashboard accepts.
 | Field | File | Size |
 | --- | --- | --- |
 | Store icon | `icon-128.png` | 128 x 128 |
-| Screenshots | `2-fight.png`, `1-select.png`, `3-block.png`, `4-again.png` | 1280 x 800 |
+| Screenshots | `2-fight.png`, `4-boss.png`, `1-select.png`, `3-block.png`, `5-again.png` | 1280 x 800 |
 | Small promo tile | `promo-440x280.png` | 440 x 280 |
 | Marquee promo tile | `promo-1400x560.png` | 1400 x 560 |
 
-Upload the screenshots in the order listed. The store shows the first one
-largest, and a fight is a better first impression than a menu — but the select
-screen belongs second, because two characters is the reason to install rather
-than a detail.
+Upload the screenshots in the order listed — five, which is the most the store
+accepts. It shows the first one largest, and a fight is a better first
+impression than a menu. The boss goes second: it is the thing that says the game
+has an ending, and the Cart reared back mid-tell is the most legible frame in
+it. The select screen is third, because two characters is a reason to install
+rather than a detail.
 
 The marquee is optional and only matters if the store ever features the
 extension. It costs nothing to supply and a listing without one looks
@@ -120,8 +130,8 @@ rejection.
 
 ## Before you submit
 
-- [ ] Bump `version` in `manifest.json`. The store rejects a version it has
-      already seen.
+- [ ] Bump `version` in `manifest.json` (and `package.json`, which names the
+      zip). The store rejects a version it has already published.
 - [ ] Check the zip actually runs: unpack it somewhere else and load *that*
       folder unpacked, not the repository. A missing build artifact is exactly
       the failure that reached a player last time.

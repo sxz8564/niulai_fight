@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { createActor } from './actor.js';
 import { Fighter, separate } from './fighter.js';
+import { Boss } from './boss.js';
 import { buildStage, clampToBelt, BELT_NEAR, BELT_FAR, STAGE_END } from './stage.js';
 import { createInput } from './input.js';
 
@@ -23,7 +24,10 @@ const GATES = [
   { x: 26, count: 3 },
   { x: 44, count: 3 },
   { x: 62, count: 4 },
-  { x: STAGE_END - 6, count: 5 }
+  // The last gate is the Cart, with two wolves to keep the player honest while
+  // they are trying to watch it. More than two and the boss stops being the
+  // thing you are paying attention to.
+  { x: STAGE_END - 6, count: 2, boss: 'cart' }
 ];
 
 export class Game {
@@ -33,6 +37,7 @@ export class Game {
     this.playerId = options.playerId || 'niulai';
     this.onState = options.onState || (() => {});
     this.enemies = [];
+    this.boss = null;
     this.gates = GATES.map((gate) => ({ ...gate }));
     this.gateIndex = 0;
     this.score = 0;
@@ -124,7 +129,7 @@ export class Game {
     actor.root.position.set(at.x, 0, at.z);
     this.scene.add(actor.root);
     const fighter = new Fighter(actor, {
-      ...stats, facing: stats.facing ?? 1, timings: spec.timings
+      ...(spec.body || {}), ...stats, facing: stats.facing ?? 1, timings: spec.timings
     });
     actor.setFacing(fighter.facing);
     return fighter;
@@ -144,7 +149,14 @@ export class Game {
 
     this.drivePlayer(dt);
     this.driveSpawns(dt);
-    for (const enemy of this.enemies) this.driveEnemy(enemy, dt);
+    // The boss is in `enemies` so that the gate counts it, but it is not driven
+    // by the wolf brain — that would have it stopping to throw punches it has
+    // no animation for, and overwriting the charge every frame.
+    for (const enemy of this.enemies) {
+      if (this.boss && enemy === this.boss.fighter) continue;
+      this.driveEnemy(enemy, dt);
+    }
+    if (this.boss) this.boss.update(dt, this.player);
 
     this.player.update(dt);
     for (const enemy of this.enemies) enemy.update(dt);
@@ -275,6 +287,9 @@ export class Game {
         if (this.player.takeHit(enemy.damage, enemy.facing)) enemy.hasLanded = true;
       }
     }
+    // The Cart does not swing at anything; it runs you over. That is contact
+    // damage, not a strike, so it is tested by overlap rather than by frames.
+    if (this.boss) this.boss.ram(this.player);
   }
 
   collide() {
@@ -307,6 +322,7 @@ export class Game {
       this.scene.remove(enemy.root);
       this.score += 400;
     }
+    if (this.boss && this.boss.fighter.dead) this.boss = null;
     this.enemies = this.enemies.filter((e) => !e.dead);
     this.onState(this.snapshot());
   }
@@ -319,6 +335,7 @@ export class Game {
       gate.opened = true;
       this.spawnQueue = gate.count;
       this.spawnTimer = 0.2;
+      if (gate.boss) this.spawnBoss(gate);
       this.onState(this.snapshot());
       return;
     }
@@ -330,6 +347,26 @@ export class Game {
       }
       this.onState(this.snapshot());
     }
+  }
+
+  /*
+   * Rolls the Cart in from the right of the gate.
+   *
+   * It is an enemy like any other — it goes in `this.enemies`, so the gate's
+   * own "is the field clear" test counts it and the level cannot advance past a
+   * boss that is still alive — and the Boss object beside it is only the thing
+   * that decides what it does with its turn.
+   */
+  spawnBoss(gate) {
+    const spec = this.specs[gate.boss];
+    if (!spec) throw new Error(`No boss called "${gate.boss}" in the registry`);
+    const fighter = this.spawnFighter(gate.boss, { x: gate.x + 3.5, z: 0.1 }, {
+      ...(spec.stats || {}), team: 'enemy', facing: -1
+    });
+    this.enemies.push(fighter);
+    this.bossSpec = spec;
+    this.boss = new Boss(fighter, { min: gate.x - 15, max: gate.x + 4 });
+    return this.boss;
   }
 
   loseLife() {
@@ -351,9 +388,34 @@ export class Game {
   }
 
   moveCamera(dt) {
-    // The camera trails the player but never shows behind the gate, so the
-    // wall the player runs into is a wall the picture agrees with.
-    const target = Math.max(0, Math.min(this.player.position.x, this.boundary - 2.2));
+    /*
+     * Pull back for the boss. A charge is five and a half units long and the
+     * ordinary framing is about seven wide, so at the normal distance the Cart
+     * would spend most of its attack off the side of the screen — the player
+     * would see it leave and see it arrive and never see it coming. Easing
+     * rather than cutting, because a hard jump reads as a bug.
+     */
+    const back = this.boss ? 13.6 : 9.4;
+    this.camera.position.z += (back - this.camera.position.z) * Math.min(1, dt * 2.2);
+
+    /*
+     * The camera trails the player but never shows behind the gate, so the wall
+     * the player runs into is a wall the picture agrees with.
+     *
+     * With a boss it frames both of them instead — the midpoint, not the
+     * player. Trailing the player put the Cart at the very edge of the picture
+     * at exactly the moment it rears back to charge, which is the one moment
+     * the whole fight depends on being able to see. The player is still kept
+     * within half a screen of the centre, so backing away from the boss can
+     * never walk them out of their own shot.
+     */
+    let target = this.player.position.x;
+    if (this.boss) {
+      const mid = (this.player.position.x + this.boss.fighter.position.x) / 2;
+      target = Math.max(target - 3.2, Math.min(target + 3.2, mid));
+    }
+    const lead = this.boss ? 2.0 : 2.2;
+    target = Math.max(0, Math.min(target, this.boundary - lead));
     this.camera.position.x += (target - this.camera.position.x) * Math.min(1, dt * 3.2);
     this.camera.lookAt(this.camera.position.x + 0.6, 1.0, 0);
     this.sun.position.set(this.camera.position.x + 6, 12, 8);
@@ -374,6 +436,13 @@ export class Game {
       stages: this.gates.length,
       over: this.over,
       won: this.won,
+      boss: this.boss && !this.boss.fighter.dead ? {
+        name: this.bossSpec.name,
+        nameChinese: this.bossSpec.nameChinese || '',
+        health: this.boss.fighter.health,
+        maxHealth: this.boss.fighter.maxHealth,
+        phase: this.boss.phase
+      } : null,
       x: this.player ? this.player.position.x : 0
     };
   }

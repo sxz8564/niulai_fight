@@ -82,41 +82,77 @@ await page.evaluate(() => {
 await page.screenshot({ path: join(out, '3-block.png') });
 console.log('3-block.png');
 
-// The end of a run, showing that it offers another one.
+/*
+ * The boss, caught in its wind-up. This is the one frame that says the game has
+ * an ending: the Cart reared back with a second to go, which is exactly what a
+ * player sees before it comes at them.
+ */
 await page.evaluate(() => {
   const api = globalThis.__niulaiFight;
   const g = api.game;
   api.release('block');
-  g.score = 12400;
+
+  // Skip to the last gate and let it open.
+  for (let i = 0; i < g.gates.length - 1; i++) g.gates[i].opened = true;
   g.gateIndex = g.gates.length - 1;
+  const gate = g.gates[g.gateIndex];
+  gate.opened = false;
+  for (const enemy of g.enemies) g.scene.remove(enemy.root);
+  g.enemies = [];
+  g.spawnQueue = 0;
+  g.player.position.set(gate.x - 4.4, 0, 0.35);
+  g.player.health = g.player.maxHealth;
+  g.player.dead = false; g.player.downTimer = 0; g.player.stunTimer = 0;
+  g.player.facing = 1;
+  api.step(0.25);
+
+  // One wolf left standing, so the shot reads as a fight rather than a standoff.
+  g.spawnQueue = 0;
+  const keep = g.enemies.filter((e) => !g.boss || e !== g.boss.fighter).slice(0, 1);
+  for (const enemy of g.enemies) {
+    if (g.boss && enemy === g.boss.fighter) continue;
+    if (!keep.includes(enemy)) g.scene.remove(enemy.root);
+  }
+  g.enemies = g.enemies.filter((e) => (g.boss && e === g.boss.fighter) || keep.includes(e));
+  if (keep[0]) keep[0].root.position.set(g.player.position.x - 1.3, 0, g.player.position.z - 0.5);
+
+  // The camera needs a moment to reach its pulled-back boss framing.
+  g.boss.fighter.position.set(g.player.position.x + 3.6, 0, 0.35);
+  api.step(1.2);
+  g.boss.enter('wind');
+  api.step(0.75);          // most of the way through the tell, at its loudest
+  g.onState(g.snapshot()); // so the bar says CHARGING, like it does in play
+});
+// The wind-up flashes the boss bar, and a screenshot taken mid-flash catches it
+// at a third opacity. Freezing the animation takes its finished state instead.
+await page.screenshot({ path: join(out, '4-boss.png'), animations: 'disabled' });
+console.log('4-boss.png');
+
+// A clean frame of the world with no interface, for the promo tiles. The boss
+// is the strongest thing in the game to put on a tile, so it is taken here.
+const plate = await page.evaluate(() => {
+  const api = globalThis.__niulaiFight;
+  const g = api.game;
+  document.getElementById('hud').style.visibility = 'hidden';
+  document.getElementById('banner').hidden = true;
+  api.step(0.12);
+  g.render();
+  return document.getElementById('view').toDataURL('image/png');
+});
+
+// The end of a run, showing that it offers another one.
+await page.evaluate(() => {
+  const api = globalThis.__niulaiFight;
+  const g = api.game;
+  document.getElementById('hud').style.visibility = '';
+  g.score = 12400;
   g.over = true;
   g.won = true;
   g.onState(g.snapshot());
   api.step(0.05);
 });
-await page.screenshot({ path: join(out, '4-again.png') });
-console.log('4-again.png');
-
-// A clean frame of the world with no interface, for the promo tiles.
-const plate = await page.evaluate(() => {
-  const api = globalThis.__niulaiFight;
-  const g = api.game;
-  g.over = false;
-  document.getElementById('hud').style.visibility = 'hidden';
-  document.getElementById('banner').hidden = true;
-  const wolf = g.enemies[0];
-  if (wolf) {
-    wolf.root.position.set(g.player.position.x + 1.25, 0, g.player.position.z);
-    wolf.stunTimer = 0; wolf.attackTimer = 0;
-  }
-  g.player.blocking = false;
-  g.player.attackTimer = 0;
-  g.player.facing = 1;
-  api.press('punch');
-  api.step(0.2);
-  g.render();
-  return document.getElementById('view').toDataURL('image/png');
-});
+await page.screenshot({ path: join(out, '5-again.png') });
+console.log('5-again.png');
 await page.close();
 
 /* ------------------------------------------------------- tiles and icons */
@@ -175,7 +211,7 @@ const art = await tilePage.evaluate(async ({ plate, modelUrl }) => {
   const small = tile(440, 280, 40, ['A side-scrolling brawler', 'in your browser.'], 15);
   const marquee = tile(1400, 560, 104, [
     'Walk right. The screen stops. Wolves arrive.',
-    'Two fighters, five stages, no permissions.'
+    'Two fighters, five stages, and a boss that charges.'
   ], 30);
 
   /*

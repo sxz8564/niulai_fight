@@ -36,7 +36,17 @@
   /* An id selector outranks the browser's own [hidden] rule, so setting
      .hidden on these would otherwise change nothing and leave the loading
      screen sitting on top of a running game. */
-  #loading[hidden], #banner[hidden], #select[hidden] { display: none; }
+  #loading[hidden], #banner[hidden], #select[hidden], #bossrow[hidden] { display: none; }
+
+  /* The boss bar. A different colour from the player's so a glance tells you
+     whose health you are looking at, and it flashes through the wind-up
+     because that second is the only warning the charge gives. */
+  .bar.boss { width: min(46vw, 340px); border-color: #ffd76a; }
+  .bar.boss > i { background: #d9843b; }
+  #bossrow.winding .bar.boss > i { background: #ffd76a; }
+  #bossrow.winding #bossname { color: #ffd76a; }
+  @keyframes tell { 50% { opacity: .35; } }
+  #bossrow.winding { animation: tell .18s steps(1) infinite; }
 
   #select { position: fixed; inset: 0; z-index: 5; display: grid; place-content: center;
             justify-items: center; gap: 6px; background: #10141a; text-align: center; }
@@ -81,6 +91,10 @@
     <span class="spacer"></span>
     <span class="label">STAGE <b id="stage">1/5</b></span>
     <span class="label">SCORE <b id="score">000000</b></span>
+  </div>
+  <div class="row" id="bossrow" hidden>
+    <span class="label" id="bossname">THE CART 木车</span>
+    <span class="bar boss"><i id="bosshealth"></i></span>
   </div>
   <div class="row"><span class="hint">← → move · ↑ ↓ step up and down · J punch · K kick · L hold to block</span></div>
 </div>

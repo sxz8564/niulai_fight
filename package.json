@@ -1,6 +1,6 @@
 {
   "name": "niulai-fight",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "A belt-scrolling brawler: Niulai against the wolves, left to right.",
   "type": "module",
@@ -13,6 +13,7 @@
     "test:extension": "node tools/extension-test.mjs",
     "models": "node tools/merge-animations.mjs",
     "clips": "node tools/clip-sheet.mjs",
+    "prop": "node tools/import-prop.mjs",
     "store": "node tools/make-store.mjs"
   },
   "dependencies": {

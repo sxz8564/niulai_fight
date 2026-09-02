@@ -25,7 +25,10 @@ const hud = {
   score: document.getElementById('score'),
   stage: document.getElementById('stage'),
   banner: document.getElementById('banner'),
-  who: document.getElementById('who')
+  who: document.getElementById('who'),
+  bossRow: document.getElementById('bossrow'),
+  bossName: document.getElementById('bossname'),
+  bossHealth: document.getElementById('bosshealth')
 };
 
 function paint(state) {
@@ -37,6 +40,23 @@ function paint(state) {
   hud.lives.textContent = '🐮'.repeat(Math.max(0, state.lives));
   hud.score.textContent = String(state.score).padStart(6, '0');
   hud.stage.textContent = `${state.stage}/${state.stages}`;
+
+  /*
+   * The boss bar only exists while there is a boss. Its wind-up gets its own
+   * treatment: the player is watching the fight, not the interface, so the tell
+   * has to be loud enough to catch out of the corner of an eye — the cart
+   * rearing back is the real signal and this is the backup.
+   */
+  const boss = state.boss;
+  hud.bossRow.hidden = !boss;
+  if (boss) {
+    const winding = boss.phase === 'wind';
+    hud.bossName.textContent = winding
+      ? `${boss.name.toUpperCase()} ${boss.nameChinese} — CHARGING`.trim()
+      : `${boss.name.toUpperCase()} ${boss.nameChinese}`.trim();
+    hud.bossHealth.style.width = `${Math.max(0, (boss.health / boss.maxHealth) * 100)}%`;
+    hud.bossRow.classList.toggle('winding', winding);
+  }
 
   if (state.over) {
     const headline = state.won

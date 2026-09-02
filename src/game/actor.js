@@ -19,6 +19,14 @@ import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js
 /** The states the game asks for. A rigged model needs a clip for each. */
 export const STATES = ['idle', 'walk', 'punch', 'kick', 'hit', 'down', 'block'];
 
+/*
+ * The states a prop understands. A vehicle has no rig and no clips, so its
+ * motion is written here — but it is still asked for by name through the same
+ * `play()` every other actor uses, so nothing outside this file knows the
+ * difference.
+ */
+export const PROP_STATES = ['idle', 'walk', 'wind', 'charge', 'recover', 'hit', 'down'];
+
 const UNIT = 1.0;            // one world unit is roughly one character height
 const HEAD_HEIGHT = 0.42;    // how much of that height the head takes up
 
@@ -87,6 +95,91 @@ function mountHead(scene3d, spec) {
   return { holder, head };
 }
 
+/*
+ * How a prop moves.
+ *
+ * Everything here is written rather than authored, because the model arrived as
+ * a single static mesh: no rig, no wheels that turn, no clips. That is not a
+ * shortcoming for a vehicle — a cart's whole vocabulary is pitch, roll and
+ * shake, and those are three lines each. What it does need is for the wind-up
+ * to look like a wind-up: the second before the charge is the only warning the
+ * player gets, so it rears back, shakes, and does it hard enough to read from
+ * across the screen.
+ *
+ * The nose points along the model's local -X, so a pitch is a rotation about
+ * local Z, and a roll is a rotation about local X.
+ */
+function updateProp(group, state, stateTime, dt, speed, jolted, spec) {
+  const roll = 1 / Math.max(0.2, spec.wheelbase || 0.42);   // wheel turns per unit
+  group.position.set(0, 0, 0);
+  group.rotation.set(0, 0, 0);
+
+  switch (state) {
+    case 'walk': {
+      // Rolling: a bounce at wheel frequency, and a pitch that lags it, so the
+      // body rocks on its suspension instead of sliding along like a decal.
+      const t = stateTime * Math.max(0.6, speed) * roll * 5.5;
+      group.position.y = Math.abs(Math.sin(t)) * 0.035;
+      group.rotation.z = Math.sin(t * 0.5) * 0.035;
+      group.rotation.x = Math.sin(t * 0.37) * 0.02;
+      break;
+    }
+    case 'wind': {
+      /*
+       * The telegraph. It rears its nose up and shudders, harder as the second
+       * runs out, so the charge is something the player saw coming rather than
+       * something that happened to them. Ramping it means the tell reads even
+       * if they only glance up at the end of it.
+       */
+      const ramp = Math.min(1, stateTime / 0.8);
+      group.rotation.z = -0.20 * ramp;                        // nose up
+      group.position.x = Math.sin(stateTime * 46) * 0.05 * ramp;
+      group.position.y = Math.abs(Math.sin(stateTime * 30)) * 0.03 * ramp;
+      group.rotation.y = Math.sin(stateTime * 38) * 0.05 * ramp;
+      break;
+    }
+    case 'charge': {
+      // Nose down and hammering. The bounce is fast and shallow: it is not
+      // driving, it is being thrown.
+      group.rotation.z = 0.13;
+      group.position.y = Math.abs(Math.sin(stateTime * 34)) * 0.05;
+      group.rotation.x = Math.sin(stateTime * 27) * 0.05;
+      break;
+    }
+    case 'recover': {
+      // Stalled and settling. This is the punish window, so it has to look
+      // like one: nose still down, rocking to a stop, going nowhere.
+      const settle = Math.exp(-stateTime * 2.2);
+      group.rotation.z = 0.16 * settle;
+      group.rotation.x = Math.sin(stateTime * 9) * 0.07 * settle;
+      group.position.y = Math.abs(Math.sin(stateTime * 7)) * 0.02 * settle;
+      break;
+    }
+    case 'down': {
+      // Wrecked: rolls onto its side and stays there.
+      const t = Math.min(1, stateTime / 0.55);
+      const ease = 1 - (1 - t) * (1 - t);
+      group.rotation.x = -1.35 * ease;
+      group.rotation.z = 0.18 * ease;
+      group.position.y = -0.04 * ease;
+      break;
+    }
+    default: {
+      // Idling: an engine note, near enough. Small, constant, never still.
+      group.position.y = Math.abs(Math.sin(stateTime * 9)) * 0.008;
+      group.rotation.z = Math.sin(stateTime * 1.6) * 0.012;
+    }
+  }
+
+  // The flinch rides on top of whatever it was already doing, so a hit landed
+  // mid-charge shows without interrupting the charge.
+  if (jolted > 0) {
+    const shock = jolted / 0.16;
+    group.position.y += shock * 0.03;
+    group.rotation.z -= shock * 0.06;
+  }
+}
+
 export function createActor(spec, gltf) {
   const root = new THREE.Group();
   root.name = spec.id;
@@ -106,9 +199,28 @@ export function createActor(spec, gltf) {
   let mixer = null;
   let actions = null;
   let parts = null;
+  let prop = null;
   let missing = [];
 
-  if (spec.animated && gltf.animations && gltf.animations.length) {
+  if (spec.prop) {
+    /*
+     * A prop: one static mesh, no rig, no clips. tools/import-prop.mjs has
+     * already stood it on the floor and centred it, so all that is left is to
+     * scale it and hand it to the procedural animation below.
+     *
+     * A plain clone rather than SkeletonUtils.clone — there is no skeleton to
+     * rebind, and the geometry and material are shared on purpose.
+     */
+    const model = gltf.scene.clone(true);
+    if (spec.scale) model.scale.setScalar(spec.scale);
+    model.traverse((node) => {
+      if (node.isMesh) { node.castShadow = true; node.receiveShadow = true; node.frustumCulled = false; }
+    });
+    // A wrapper the animation writes to, so the scale set above survives.
+    prop = new THREE.Group();
+    prop.add(model);
+    facing.add(prop);
+  } else if (spec.animated && gltf.animations && gltf.animations.length) {
     /*
      * A rigged model brings its own body and its own motion — but a clip as
      * exported is rarely the clip a game wants. These arrive as complete
@@ -201,6 +313,7 @@ export function createActor(spec, gltf) {
   let state = 'idle';
   let stateTime = 0;
   let phase = 0;      // walk-cycle phase, kept across states so gait is continuous
+  let jolted = 0;     // counts down through a hit flinch that does not change state
 
   return {
     root,
@@ -218,7 +331,14 @@ export function createActor(spec, gltf) {
      * swing, and a character facing the camera is facing nowhere.
      */
     setFacing(dir) {
-      facing.rotation.y = dir >= 0 ? Math.PI / 2 : -Math.PI / 2;
+      /*
+       * The characters are authored facing +Z, so a quarter turn puts them
+       * side-on down the belt. A prop is authored however its generator felt
+       * like — the cart's nose points along -X — so the registry carries the
+       * extra turn that lines it up, and one rule covers both.
+       */
+      const offset = ((spec.faceOffsetDeg || 0) * Math.PI) / 180;
+      facing.rotation.y = (dir >= 0 ? Math.PI / 2 : -Math.PI / 2) + offset;
     },
 
     play(next) {
@@ -239,6 +359,14 @@ export function createActor(spec, gltf) {
     /** States the model had no clip for — reported so a gap is visible. */
     get missingClips() { return missing; },
 
+    /*
+     * A visible flinch that does not change state. An armoured fighter never
+     * plays its hit reaction, which leaves the player with no evidence that
+     * their punches are landing at all — the health bar is across the screen
+     * and they are watching the fight, not the bar.
+     */
+    jolt() { jolted = 0.16; },
+
     /**
      * @param {number} dt seconds
      * @param {number} speed 0..1, how fast the actor is travelling — drives the
@@ -246,6 +374,8 @@ export function createActor(spec, gltf) {
      */
     update(dt, speed = 0) {
       stateTime += dt;
+      if (jolted > 0) jolted -= dt;
+      if (prop) { updateProp(prop, state, stateTime, dt, speed, jolted, spec); return; }
       if (mixer) {
         /*
          * Tie the gait to the ground speed. A walk cycle played at a fixed

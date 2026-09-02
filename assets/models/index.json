@@ -183,5 +183,36 @@
       "hit": 0.3,
       "down": 1.2
     }
+  },
+  {
+    "id": "cart",
+    "name": "The Cart",
+    "nameChinese": "木车",
+    "file": "cart-boss.glb",
+    "role": "boss",
+    "prop": true,
+    "_comment": "A static mesh, not a rig: no bones, no clips, brought in by tools/import-prop.mjs. Its motion is written in actor.js, because a vehicle's whole vocabulary is pitch, roll and shake. scale 2.8 makes it 1.20 units tall, 2.80 long and 1.42 deep — taller than a fighter and nearly three times as long, which is what makes it read as the end of the level rather than a big wolf.",
+    "scale": 2.8,
+    "faceOffsetDeg": 90,
+    "_faceOffset": "The model's nose points along its own -X. The characters are authored facing +Z, so the game's quarter turn lines them up down the belt and turns the cart across it; this cancels that.",
+    "wheelbase": 0.42,
+    "body": {
+      "radius": 1.35,
+      "hurtRadius": 1.35,
+      "knockback": 0.05,
+      "immovable": true,
+      "armored": true,
+      "hurtDepth": 0.76
+    },
+    "_body": "radius and hurtRadius are its half-length, hurtDepth its half-depth. Set them smaller than the bodywork and the player is shoved to a stop while still standing inside it. hurtRadius is what makes it hittable at all: a punch measured centre to centre could never reach, because its side is in the player's face while its centre sits further away than an arm is long.",
+    "timings": {
+      "hit": 0.2,
+      "down": 1.8
+    },
+    "stats": {
+      "health": 220,
+      "speed": 2.1,
+      "damage": 34
+    }
   }
 ]
