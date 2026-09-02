@@ -17,25 +17,29 @@
   #hud { position: fixed; inset: 0; pointer-events: none; padding: 14px;
          display: flex; flex-direction: column; gap: 10px; }
   .row { display: flex; align-items: center; gap: 14px; }
-  .bar { width: min(38vw, 280px); height: 16px; border: 2px solid #f4e7cf;
+  .bar { width: min(38vw, 280px); height: 18px; border: 2px solid #f4e7cf;
          background: #2a1d16; padding: 2px; }
   .bar > i { display: block; height: 100%; width: 100%; background: #7ec850;
              transition: width 120ms linear; }
   .bar > i.low { background: #d9483b; }
-  .label { color: #f4e7cf; font-size: 13px; letter-spacing: .08em; text-shadow: 0 2px 0 #000; }
+  .label { color: #f4e7cf; font-size: 15px; letter-spacing: .08em;
+           white-space: nowrap; text-shadow: 0 2px 0 #000, 0 0 4px rgba(0,0,0,.6); }
   .spacer { flex: 1; }
 
   #banner { position: fixed; inset: 0; display: grid; place-items: center;
             align-content: center; gap: 18px;
-            color: #ffd76a; font-size: clamp(22px, 5vw, 54px); letter-spacing: .1em;
-            text-shadow: 0 4px 0 #000; pointer-events: none; text-align: center; }
-  #banner .again { color: #f4e7cf; font-size: 14px; letter-spacing: .18em;
-                   text-shadow: 0 2px 0 #000; }
+            color: #ffd76a; font-size: clamp(26px, 5.6vw, 60px); letter-spacing: .1em;
+            /* Gold on a cream sky is nearly the same value. The hard drop makes
+               the shape; the soft one underneath separates it from the sky. */
+            text-shadow: 0 4px 0 #000, 0 0 14px rgba(0, 0, 0, .8);
+            pointer-events: none; text-align: center; }
+  #banner .again { color: #f4e7cf; font-size: 17px; letter-spacing: .18em;
+                   text-shadow: 0 2px 0 #000, 0 0 6px rgba(0, 0, 0, .85); }
   /* A win has something to look at underneath it, so the words move out of the
      middle of the picture and let the hero have it. */
   #banner.won { align-content: start; padding-top: 7vh; }
   #loading { position: fixed; inset: 0; display: grid; place-items: center;
-             color: #f4e7cf; background: #10141a; font-size: 15px; letter-spacing: .1em; }
+             color: #f4e7cf; background: #10141a; font-size: 17px; letter-spacing: .1em; }
   /* An id selector outranks the browser's own [hidden] rule, so setting
      .hidden on these would otherwise change nothing and leave the loading
      screen sitting on top of a running game. */
@@ -70,28 +74,28 @@
   #select h1 { color: #f4e7cf; font-size: clamp(24px, 4vw, 40px); margin: 0 0 2px;
                letter-spacing: .08em; }
   #select h1 span { color: #ffd76a; }
-  #select p { color: #8b95a3; font-size: 13px; letter-spacing: .1em; margin: 0 0 14px; }
-  #select .foot { margin-top: 18px; font-size: 11px; }
+  #select p { color: #8b95a3; font-size: 15px; letter-spacing: .1em; margin: 0 0 14px; }
+  #select .foot { margin-top: 18px; font-size: 13px; }
   /* The music switch. Small, out of the way of the roster, and readable from
      across the room because it is the one control on this screen that is not a
      character. */
   #music { margin-top: 14px; background: none; border: 2px solid #39424f;
-           border-radius: 999px; color: #8b95a3; font: inherit; font-size: 11px;
+           border-radius: 999px; color: #8b95a3; font: inherit; font-size: 13px;
            letter-spacing: .16em; padding: 7px 16px; cursor: pointer; }
   #music:hover, #music:focus-visible { border-color: #ffd76a; color: #ffd76a; outline: none; }
   #music[aria-pressed="false"] { color: #5d6773; border-color: #2b323c; }
   #roster { display: flex; gap: 18px; flex-wrap: wrap; justify-content: center; }
   /* Each card carries its own little renderer, so the roster shows the actual
      models rather than art that could drift from them. */
-  #roster button { width: 210px; background: #1b2028; border: 2px solid #39424f;
+  #roster button { width: 234px; background: #1b2028; border: 2px solid #39424f;
                    border-radius: 12px; padding: 12px; color: #f4e7cf; font: inherit;
                    cursor: pointer; display: grid; justify-items: center; gap: 6px; }
   #roster button:hover, #roster button:focus-visible { border-color: #ffd76a; outline: none; }
   #roster canvas { width: 168px; height: 168px; display: block; }
-  #roster .name { font-size: 15px; letter-spacing: .06em; }
-  #roster .zh { color: #ffd76a; font-size: 13px; }
-  #roster .blurb { color: #8b95a3; font-size: 11px; line-height: 1.5; min-height: 2.6em; }
-  #roster .key { color: #5d6773; font-size: 10px; letter-spacing: .14em; }
+  #roster .name { font-size: 18px; letter-spacing: .06em; }
+  #roster .zh { color: #ffd76a; font-size: 15px; }
+  #roster .blurb { color: #8b95a3; font-size: 13px; line-height: 1.5; min-height: 2.6em; }
+  #roster .key { color: #5d6773; font-size: 12px; letter-spacing: .14em; }
 
   #pad { position: fixed; inset: auto 0 0 0; padding: 18px;
          display: flex; justify-content: space-between; pointer-events: none; }
@@ -102,7 +106,11 @@
   #pad button:active { background: #f4e7cf; color: #2a1d16; }
   #pad button[hidden] { display: none; }
   #padpower { border-color: #d1a0ff; color: #d1a0ff; }
-  .hint { color: #8b95a3; font-size: 12px; letter-spacing: .06em; }
+  /* The hint sits over the sky, which is nearly white, and over trees, which
+     are nearly black. Grey with no shadow disappeared into both. Light text
+     with a hard dark shadow is the only thing that reads on either. */
+  .hint { color: #d3dae3; font-size: 14px; letter-spacing: .06em;
+          text-shadow: 0 2px 0 #000, 0 0 4px rgba(0,0,0,.7); }
   /* A keyboard makes the on-screen pad redundant, and it covers the ground. */
   @media (hover: hover) and (pointer: fine) { #pad { display: none; } }
 </style>
