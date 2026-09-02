@@ -59,7 +59,7 @@ library — for a handful of impacts that is the whole job.
 | **charge** | the Cart's engine, on the wind-up |
 | **win**, **loss** | the two ways a run ends |
 | **select**, **confirm** | moving across the roster, and choosing |
-| **theme** | a twenty-second loop, under everything |
+| **theme** | a two-and-a-quarter-minute loop, under everything |
 
 **Punches and kicks are the player's only.** The wolves throwing the same sound
 back would turn a crowd into noise, and the point of these is that a player can
@@ -118,10 +118,22 @@ Starting it is the fiddly part, and it took two goes:
 
 Everything is Opus in WebM, including the sources that arrived as MP3, Ogg
 Vorbis and 24-bit WAV: one format the whole toolchain and both test suites
-already know how to check.
+already know how to check. Effects are 64 kbps stereo; the theme is 48 kbps
+mono, which is under a megabyte for two and a quarter minutes and
+indistinguishable underneath the game at a third of full volume. Downmixing to
+mono pushes the peak about three decibels over, so it is trimmed by rather more
+than that or it clips — measure the output, do not assume the trim landed.
+
+**Not MIDI**, which was tried and thrown away. The same music as a MIDI file is
+5.9 KB against 970, which sounds decisive until it is weighed: no browser can
+play a MIDI file, so shipping one means shipping a synthesiser as well, and the
+music then no longer sounds like the recording — it sounds like three
+oscillators, which nobody can check without listening to it. Trading known-good
+audio for unheard audio, plus two hundred lines of parser and synth to maintain,
+is not a bargain at any file size.
 
 ```bash
-ffmpeg -i in.wav -vn -c:a libopus -b:a 64k -ar 48000 assets/audio/out.webm
+ffmpeg -i theme.ogg -vn -af "volume=-4.5dB" -c:a libopus -b:a 48k -ac 1 assets/audio/theme.webm
 ```
 
 ## Rage
