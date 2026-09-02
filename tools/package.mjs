@@ -18,7 +18,8 @@ const out = join(root, 'dist', `niulai-fight-${manifest.version}.zip`);
 mkdirSync(join(root, 'dist'), { recursive: true });
 rmSync(out, { force: true });
 
-const include = ['manifest.json', 'index.html', 'icons', 'assets', 'dist/bundle.js', 'src/background.js'];
+const include = ['manifest.json', 'index.html', 'icons', 'assets',
+                 'dist/bundle.js', 'src/background.js', 'src/boot-check.js'];
 execFileSync('zip', ['-r', '-q', out, ...include], { cwd: root });
 
 const size = execFileSync('du', ['-h', out]).toString().split('\t')[0];

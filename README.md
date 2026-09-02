@@ -30,13 +30,19 @@ and you cannot hit it. Circling is how you fight three at once.
 
 ## Installing it
 
+Clone it, then in Chrome: **chrome://extensions** → turn on **Developer mode**
+→ **Load unpacked** → choose this folder. The toolbar button opens the game.
+
+No build step. `dist/bundle.js` is committed precisely so that works — a folder
+you load unpacked has to be loadable unpacked, and requiring a build first
+means a fresh clone fails with `ERR_FILE_NOT_FOUND` and a blank screen.
+
+If you change anything under `src/`, rebuild it:
+
 ```bash
 npm install
 npm run build
 ```
-
-Then in Chrome: **chrome://extensions** → turn on **Developer mode** →
-**Load unpacked** → choose this folder. The toolbar button opens the game.
 
 `npm run package` builds `dist/niulai-fight-<version>.zip` for the Web Store.
 

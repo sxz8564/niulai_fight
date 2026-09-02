@@ -1,5 +1,11 @@
 node_modules/
 dist/
+# ...except the bundle. This folder is loaded unpacked straight from a clone,
+# so the one build artifact the page actually needs is committed. Rebuild it
+# with `npm run build` after changing anything under src/.
+!dist/
+dist/*
+!dist/bundle.js
 .DS_Store
 *.log
 .smoke/

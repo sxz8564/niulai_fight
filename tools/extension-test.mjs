@@ -1,5 +1,5 @@
 import { createRequire } from 'node:module';
-import { mkdirSync, mkdtempSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -28,6 +28,30 @@ function check(label, ok, detail = '') {
   if (ok) { passed++; console.log(`PASS  ${label}${detail ? ' — ' + detail : ''}`); }
   else { failed++; console.log(`FAIL  ${label}${detail ? ' — ' + detail : ''}`); }
 }
+
+/*
+ * Before launching anything: does every file the extension names actually
+ * exist?
+ *
+ * This is here because it did not, and a user found out instead of the tests.
+ * dist/bundle.js is a build artifact that was excluded from the repository, so
+ * a fresh clone loaded unpacked reported net::ERR_FILE_NOT_FOUND to a console
+ * nobody had open and sat on a loading screen. Every check below this line
+ * passed throughout, because they all ran in a working tree that had been
+ * built. Checking the references themselves is the only thing that catches it.
+ */
+const referenced = [];
+const html = readFileSync(join(root, 'index.html'), 'utf8');
+for (const match of html.matchAll(/(?:src|href)="([^"]+)"/g)) {
+  const url = match[1];
+  if (!/^(https?:|data:|#)/.test(url)) referenced.push(url);
+}
+const manifest = JSON.parse(readFileSync(join(root, 'manifest.json'), 'utf8'));
+referenced.push(manifest.background.service_worker, ...Object.values(manifest.icons));
+
+const absent = referenced.filter((file) => !existsSync(join(root, file)));
+check('every file the extension references exists', absent.length === 0,
+  absent.length ? `missing: ${absent.join(', ')}` : `${referenced.length} checked`);
 
 const profile = mkdtempSync(join(tmpdir(), 'niulai-fight-'));
 const context = await chromium.launchPersistentContext(profile, {
