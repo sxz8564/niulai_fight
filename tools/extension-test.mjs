@@ -82,7 +82,10 @@ page.on('response', (r) => { if (r.status() >= 400) errors.push(`HTTP ${r.status
 page.on('requestfailed', (r) => errors.push(`request failed ${r.url()}`));
 
 await page.goto(`chrome-extension://${id}/index.html`, { waitUntil: 'load' });
+// The select screen comes first now, so the harness picks for itself.
 await page.waitForFunction(() => globalThis.__niulaiFight, null, { timeout: 60000 });
+await page.evaluate(() => globalThis.__niulaiFight.choose('niulai'));
+await page.waitForFunction(() => globalThis.__niulaiFight.game, null, { timeout: 60000 });
 check('the game page opens from chrome-extension://', true, page.url().slice(0, 42) + '…');
 
 /*

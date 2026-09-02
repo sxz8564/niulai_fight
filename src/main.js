@@ -1,4 +1,5 @@
 import { Game } from './game/game.js';
+import { chooseCharacter } from './select.js';
 
 /*
  * Bootstrap: build the game, wire the HUD, run the loop.
@@ -15,10 +16,14 @@ const hud = {
   lives: document.getElementById('lives'),
   score: document.getElementById('score'),
   stage: document.getElementById('stage'),
-  banner: document.getElementById('banner')
+  banner: document.getElementById('banner'),
+  who: document.getElementById('who')
 };
 
 function paint(state) {
+  if (state.playerName) {
+    hud.who.textContent = `${state.playerName.toUpperCase()} ${state.playerNameChinese || ''}`.trim();
+  }
   hud.health.style.width = `${(state.health / state.maxHealth) * 100}%`;
   hud.health.classList.toggle('low', state.health <= state.maxHealth * 0.3);
   hud.lives.textContent = '🐮'.repeat(Math.max(0, state.lives));
@@ -26,14 +31,34 @@ function paint(state) {
   hud.stage.textContent = `${state.stage}/${state.stages}`;
 
   if (state.over) {
-    hud.banner.textContent = state.won ? '牛来赢了  ·  NIULAI WINS' : 'GAME OVER';
+    hud.banner.textContent = state.won
+      ? `${state.playerNameChinese || ''}赢了  ·  ${(state.playerName || '').toUpperCase()} WINS`.trim()
+      : 'GAME OVER';
     hud.banner.hidden = false;
   } else if (state.enemies > 0) {
     hud.banner.hidden = true;
   }
 }
 
-const game = new Game(canvas, { onState: paint });
+const select = document.getElementById('select');
+
+/*
+ * The test harness needs to exist before a human has chosen anything, so the
+ * global is published immediately with just `choose`. Everything else appears
+ * on it once a character is picked and the game has loaded.
+ */
+let resolveChoice;
+const chosen = new Promise((resolve) => { resolveChoice = resolve; });
+globalThis.__niulaiFight = { choose: (id) => resolveChoice(id) };
+
+document.getElementById('loading').hidden = true;
+chooseCharacter('assets/', document.getElementById('roster')).then(resolveChoice);
+
+const playerId = await chosen;
+select.hidden = true;
+document.getElementById('loading').hidden = false;
+
+const game = new Game(canvas, { onState: paint, playerId });
 
 function fit() {
   const width = canvas.clientWidth || window.innerWidth;
@@ -70,7 +95,7 @@ raf = requestAnimationFrame(frame);
 
 document.getElementById('loading').hidden = true;
 
-globalThis.__niulaiFight = {
+Object.assign(globalThis.__niulaiFight, {
   game,
   /** Advances the simulation deterministically, for tests. */
   step(seconds, slice = 1 / 60) {
@@ -81,4 +106,4 @@ globalThis.__niulaiFight = {
   press(action) { game.input.press(action); },
   release(action) { game.input.release(action); },
   stop() { cancelAnimationFrame(raf); }
-};
+});

@@ -25,6 +25,7 @@ export class Game {
   constructor(canvas, options = {}) {
     this.canvas = canvas;
     this.assetBase = options.assetBase || 'assets/';
+    this.playerId = options.playerId || 'niulai';
     this.onState = options.onState || (() => {});
     this.enemies = [];
     this.gateIndex = 0;
@@ -86,8 +87,12 @@ export class Game {
     this.lights();
     buildStage(this.scene, { backdrop });
 
-    this.player = this.spawnFighter('niulai', { x: 0, z: 0.2 }, {
-      health: 100, speed: 4.1, damage: 12, team: 'player'
+    const hero = this.specs[this.playerId];
+    if (!hero) throw new Error(`No character called "${this.playerId}" in the registry`);
+    // Stats live beside the clips, so a new hero is a registry entry rather
+    // than a change here.
+    this.player = this.spawnFighter(this.playerId, { x: 0, z: 0.2 }, {
+      ...(hero.stats || { health: 100, speed: 4.1, damage: 12 }), team: 'player'
     });
     this.onState(this.snapshot());
     return this;
@@ -351,6 +356,9 @@ export class Game {
 
   snapshot() {
     return {
+      player: this.playerId,
+      playerName: this.specs ? this.specs[this.playerId].name : this.playerId,
+      playerNameChinese: this.specs ? this.specs[this.playerId].nameChinese : '',
       health: this.player ? this.player.health : 0,
       maxHealth: this.player ? this.player.maxHealth : 100,
       lives: this.lives,

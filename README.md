@@ -1,14 +1,21 @@
 # Niulai Fight 牛来大战
 
 A belt-scrolling brawler in the shape of the Famicom ones: walk right, the
-screen stops, wolves arrive, clear them, the screen lets you on. Niulai fights
-through woods and grassland; Wolfwolf comes in packs.
+screen stops, wolves arrive, clear them, the screen lets you on. Two fighters
+to pick from — Niulai 牛来 and Baola 豹拉 — against Wolfwolf, who comes in
+packs, through woods and grassland.
 
 Runs as a Chrome extension. Click the toolbar button and it opens in a tab.
 
-![Niulai between two wolves in the woods](docs/screenshot.png)
+![The character select: Niulai and Baola](docs/select.png)
+
+![Baola between two wolves in the woods](docs/screenshot.png)
 
 ## Playing it
+
+Pick a fighter first. **Niulai** is steady — more health, hits harder.
+**Baola** is quick — faster on her feet and easier to hurt. Press **1** or
+**2**, or click a card.
 
 | | |
 | --- | --- |
@@ -54,9 +61,15 @@ npm run serve      # then open the printed address
 
 ## The characters
 
-**Both characters are rigged bipeds.** `npm run models` reads one folder per
-character under `incoming/` and writes a single `.glb` each — 11 clips for
-Niulai, 10 for Wolfwolf, around 0.9 MB apiece.
+**All three characters are rigged bipeds.** `npm run models` reads one folder
+per character under `incoming/` and writes a single `.glb` each — 11 clips for
+Niulai and Baola, 10 for Wolfwolf, around a megabyte apiece.
+
+Adding a fighter is a registry entry, not a code change: give it `playable:
+true`, its clip trims and its stats, and it appears on the select screen with a
+portrait rendered from the model itself. Baola went in that way, and reuses
+Niulai's trims unchanged — the clips came from the same generator with the same
+names, so the slices that worked for him work for her.
 
 Locomotion speed follows actual ground speed, so nobody skates. Niulai uses the
 **run** cycle because he covers about four body-heights a second; the wolves,
@@ -98,6 +111,7 @@ way a player loads it.
 ```
 src/
 ├── main.js            bootstrap, HUD, the frame loop
+├── select.js          the character select, portraits and all
 ├── background.js      the extension: one click, one tab
 └── game/
     ├── game.js        waves, gates, camera, the rules

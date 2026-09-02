@@ -57,7 +57,80 @@
       "hit": 0.34,
       "down": 1.25
     },
-    "_spares": "walk, hurdle and backjump are merged and trimmed but not bound to anything yet. jump needs an air state before it is worth wiring; knee is an obvious heavy attack."
+    "_spares": "hurdle, backjump and jump are merged and trimmed but not bound to anything: jumping needs an air state first. knee is an obvious heavy attack whenever a third button is wanted.",
+    "playable": true,
+    "blurb": "Steady. Hits harder, takes more.",
+    "stats": {
+      "health": 100,
+      "speed": 4.1,
+      "damage": 12
+    }
+  },
+  {
+    "id": "baola",
+    "name": "Baola",
+    "nameChinese": "豹拉",
+    "file": "baola-rigged.glb",
+    "role": "player",
+    "playable": true,
+    "blurb": "Quick. Faster on her feet, easier to hurt.",
+    "animated": true,
+    "scale": 0.588,
+    "_comment": "A leopard: quicker than Niulai and lighter. Same eleven clips, same trims — they came from the same generator with the same names, so the slices that worked for him work for her.",
+    "clips": {
+      "idle": {
+        "clip": "punch",
+        "from": 0.0,
+        "to": 1.3,
+        "loop": true
+      },
+      "walk": {
+        "clip": "run",
+        "loop": true,
+        "gait": 1.2
+      },
+      "punch": {
+        "clip": "punch",
+        "from": 1.45,
+        "to": 2.45
+      },
+      "kick": {
+        "clip": "kick",
+        "from": 0.45,
+        "to": 1.15
+      },
+      "knee": {
+        "clip": "knee",
+        "from": 0.7,
+        "to": 1.6
+      },
+      "hit": {
+        "clip": "hit",
+        "from": 0.1,
+        "to": 0.85
+      },
+      "down": {
+        "clip": "down"
+      },
+      "jump": {
+        "clip": "jump"
+      },
+      "block": {
+        "clip": "block",
+        "loop": false
+      }
+    },
+    "timings": {
+      "punch": 0.42,
+      "kick": 0.36,
+      "hit": 0.32,
+      "down": 1.25
+    },
+    "stats": {
+      "health": 88,
+      "speed": 4.7,
+      "damage": 11
+    }
   },
   {
     "id": "wolfwolf",

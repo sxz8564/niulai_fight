@@ -22,6 +22,15 @@ export function serve(port = 0) {
   const server = createServer(async (request, response) => {
     try {
       const url = new URL(request.url, 'http://localhost');
+
+      // An empty page on this origin. tools/merge-animations.mjs opens it and
+      // fetches the source models from here, which keeps 60 MB of character
+      // out of a page.evaluate argument.
+      if (url.pathname === '/__blank') {
+        response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+        response.end('<!doctype html><title>blank</title>');
+        return;
+      }
       // normalize collapses any ../ before it can climb out of the directory.
       const relative = normalize(decodeURIComponent(url.pathname)).replace(/^(\.\.[/\\])+/, '');
       let file = join(root, relative === '/' ? 'index.html' : relative);

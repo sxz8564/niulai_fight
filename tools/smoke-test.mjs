@@ -59,7 +59,10 @@ page.on('requestfailed', (r) => {
 });
 
 await page.goto(url, { waitUntil: 'load' });
+// The select screen comes first now, so the harness picks for itself.
 await page.waitForFunction(() => globalThis.__niulaiFight, null, { timeout: 60000 });
+await page.evaluate(() => globalThis.__niulaiFight.choose('niulai'));
+await page.waitForFunction(() => globalThis.__niulaiFight.game, null, { timeout: 60000 });
 
 // Software GL is slow; stop the render loop and drive the clock ourselves so
 // the test measures the game rather than the frame rate.
@@ -134,9 +137,21 @@ check('the gate holds the player back', held.x <= held.boundary + 0.01,
 /* A punch has to hurt something. Put a wolf in reach and swing. */
 const punch = await api(() => {
   const g = globalThis.__niulaiFight.game;
+
+  // Both fighters into a known state. Ten seconds of walking past wolves
+  // leaves the player as likely as not in hitstun, and a punch pressed then is
+  // buffered for a quarter second and dropped — the check measures the weather
+  // rather than the punch.
+  const p = g.player;
+  p.health = p.maxHealth;
+  p.dead = false; p.downTimer = 0; p.stunTimer = 0; p.attackTimer = 0;
+  p.blocking = false;
+  g.buffered = null;
+
   const wolf = g.enemies[0];
-  wolf.root.position.set(g.player.position.x + 0.6, 0, g.player.position.z);
-  wolf.stunTimer = 0; wolf.attackTimer = 0;
+  wolf.root.position.set(p.position.x + 0.6, 0, p.position.z);
+  wolf.stunTimer = 0; wolf.attackTimer = 0; wolf.downTimer = 0;
+  wolf.invulnerable = 0; wolf.dead = false;
   g.player.facing = 1;
   const before = wolf.health;
   const swing = g.player.timings.punch + 0.2;
@@ -347,6 +362,35 @@ const cost = await api(() => {
 check('you cannot walk while blocking', cost.movedWhileBlocking < 0.05,
   `moved ${cost.movedWhileBlocking.toFixed(3)}`);
 check('you cannot swing while blocking', !cost.attackedWhileBlocking);
+
+/*
+ * Baola is the other hero. Loading her is the check that a second playable
+ * character is a registry entry rather than a code change — and that the clip
+ * trims written for Niulai actually fit her, since they came from the same
+ * generator with the same names.
+ */
+const second = await page.evaluate(async () => {
+  const { Game } = globalThis.__niulaiFight.game.constructor === Function
+    ? {} : { Game: globalThis.__niulaiFight.game.constructor };
+  const canvas = document.createElement('canvas');
+  canvas.width = 320; canvas.height = 180;
+  const baola = new Game(canvas, { playerId: 'baola' });
+  await baola.load();
+  const missing = baola.player.actor.missingClips;
+  const snap = baola.snapshot();
+  return {
+    name: snap.playerName,
+    chinese: snap.playerNameChinese,
+    health: snap.maxHealth,
+    speed: baola.player.speed,
+    missing
+  };
+});
+check('Baola loads as a second hero', second.name === 'Baola', `${second.name} ${second.chinese}`);
+check('Baola has a clip for every state', second.missing.length === 0,
+  second.missing.join(', ') || 'all present');
+check('the two heroes are not identical', second.speed !== 4.1 || second.health !== 100,
+  `Baola: ${second.health} hp, speed ${second.speed}`);
 
 check('still no script errors after playing', errors.length === 0, errors[0] || '');
 

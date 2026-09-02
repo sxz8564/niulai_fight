@@ -33,7 +33,27 @@
   /* An id selector outranks the browser's own [hidden] rule, so setting
      .hidden on these would otherwise change nothing and leave the loading
      screen sitting on top of a running game. */
-  #loading[hidden], #banner[hidden] { display: none; }
+  #loading[hidden], #banner[hidden], #select[hidden] { display: none; }
+
+  #select { position: fixed; inset: 0; z-index: 5; display: grid; place-content: center;
+            justify-items: center; gap: 6px; background: #10141a; text-align: center; }
+  #select h1 { color: #f4e7cf; font-size: clamp(24px, 4vw, 40px); margin: 0 0 2px;
+               letter-spacing: .08em; }
+  #select h1 span { color: #ffd76a; }
+  #select p { color: #8b95a3; font-size: 13px; letter-spacing: .1em; margin: 0 0 14px; }
+  #select .foot { margin-top: 18px; font-size: 11px; }
+  #roster { display: flex; gap: 18px; flex-wrap: wrap; justify-content: center; }
+  /* Each card carries its own little renderer, so the roster shows the actual
+     models rather than art that could drift from them. */
+  #roster button { width: 210px; background: #1b2028; border: 2px solid #39424f;
+                   border-radius: 12px; padding: 12px; color: #f4e7cf; font: inherit;
+                   cursor: pointer; display: grid; justify-items: center; gap: 6px; }
+  #roster button:hover, #roster button:focus-visible { border-color: #ffd76a; outline: none; }
+  #roster canvas { width: 168px; height: 168px; display: block; }
+  #roster .name { font-size: 15px; letter-spacing: .06em; }
+  #roster .zh { color: #ffd76a; font-size: 13px; }
+  #roster .blurb { color: #8b95a3; font-size: 11px; line-height: 1.5; min-height: 2.6em; }
+  #roster .key { color: #5d6773; font-size: 10px; letter-spacing: .14em; }
 
   #pad { position: fixed; inset: auto 0 0 0; padding: 18px;
          display: flex; justify-content: space-between; pointer-events: none; }
@@ -52,7 +72,7 @@
 
 <div id="hud">
   <div class="row">
-    <span class="label">NIULAI 牛来</span>
+    <span class="label" id="who">NIULAI 牛来</span>
     <span class="bar"><i id="health"></i></span>
     <span class="label" id="lives">🐮🐮🐮</span>
     <span class="spacer"></span>
@@ -63,6 +83,13 @@
 </div>
 
 <div id="banner" hidden></div>
+
+<div id="select">
+  <h1>Niulai Fight <span>牛来大战</span></h1>
+  <p>Choose a fighter</p>
+  <div id="roster"></div>
+  <p class="foot">1 / 2 or click · then ← → to move, J punch, K kick, L block</p>
+</div>
 <div id="loading">LOADING…</div>
 
 <div id="pad">

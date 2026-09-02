@@ -33,6 +33,8 @@ import { fileURLToPath } from 'node:url';
  * Runs in headless Chromium because three.js's exporter is a browser thing.
  */
 
+import { serve } from './serve.mjs';
+
 const require = createRequire(import.meta.url);
 const { chromium } = require('playwright');
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -88,6 +90,7 @@ if (!characters.length) {
   process.exit(1);
 }
 
+const { server, url: origin } = await serve(0);
 const browser = await chromium.launch({
   args: ['--no-sandbox', '--enable-unsafe-swiftshader'],
   executablePath: process.env.PLAYWRIGHT_CHROMIUM || undefined
@@ -104,35 +107,45 @@ for (const character of characters) {
   for (const entry of named) {
     if (!entry.state) console.warn(`  ? ${character}: no state matched for ${entry.file}`);
   }
+  /*
+   * Names and URLs only. Passing the files themselves through page.evaluate
+   * means base64-encoding every one of them into a single argument, and with
+   * three characters of eleven 5 MB clips each that is enough to take the
+   * renderer out with an out-of-memory kill. The page fetches them instead,
+   * one at a time, and lets each go before asking for the next.
+   */
   const payload = named.map(({ file, state }) => ({
-    file, state, base64: readFileSync(join(folder, file)).toString('base64')
+    file, state, url: `${origin}incoming/${character}/${encodeURIComponent(file)}`
   }));
 
   // A fresh page per character: the previous one is holding a few hundred
   // megabytes of decoded texture and skinned geometry.
   const page = await browser.newPage();
+  await page.goto(`${origin}__blank`);
   await page.addScriptTag({ content: readFileSync(join(root, 'dist/merge-deps.js'), 'utf8') });
 
   const result = await page.evaluate(async ({ inputs, riseFor }) => {
   const { GLTFLoader, GLTFExporter, THREE } = globalThis.__mergeDeps;
   const loader = new GLTFLoader();
 
-  const loaded = [];
-  for (const input of inputs) {
-    const bytes = Uint8Array.from(atob(input.base64), (c) => c.charCodeAt(0)).buffer;
-    const gltf = await loader.parseAsync(bytes, '');
-    loaded.push({ ...input, gltf });
-  }
-
-  const base = loaded[0];
-  const scene = base.gltf.scene;
-
+  /*
+   * One file at a time. Only the first file's scene is kept — every export
+   * carries the same mesh — and each of the others is reduced to its clips and
+   * then dropped, so peak memory is one character rather than eleven.
+   */
+  let scene = null;
   const clips = [];
   const report = [];
-  for (const item of loaded) {
-    for (const clip of item.gltf.animations) {
+
+  for (const input of inputs) {
+    const response = await fetch(input.url);
+    if (!response.ok) throw new Error(`${response.status} fetching ${input.url}`);
+    const gltf = await loader.parseAsync(await response.arrayBuffer(), '');
+    if (!scene) scene = gltf.scene;
+
+    for (const clip of gltf.animations) {
       const original = clip.name;
-      clip.name = item.state || original.replace(/^Armature\|/, '').replace(/\|baselayer$/, '');
+      clip.name = input.state || original.replace(/^Armature\|/, '').replace(/\|baselayer$/, '');
 
       /*
        * Root translation has to go. These clips move the whole character —
@@ -273,3 +286,4 @@ for (const character of characters) {
 }
 
 await browser.close();
+server.close();
