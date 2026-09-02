@@ -1000,6 +1000,16 @@ const second = await page.evaluate(async () => {
   const changed = {
     form: baola.player.actor.root.name,
     named: baola.snapshot().playerName,
+    /*
+     * Every state the game will ask the swapped-in body for, answerable. The
+     * form is re-textured from time to time — new maps onto the same rig — and
+     * a re-texture that came back without the clips would leave her frozen in
+     * her bind pose for seven seconds while every other check here still
+     * passed, because the damage numbers are the Fighter's and have nothing to
+     * do with whether anything is moving.
+     */
+    plays: ['idle', 'walk', 'punch', 'kick', 'hit', 'down', 'block']
+      .filter((state) => !baola.player.actor.has(state)),
     remaining: baola.power.remaining,
     locked: baola.power.casting,
     inScene: baola.scene.children.includes(baola.player.root),
@@ -1143,6 +1153,8 @@ check('and she comes back down at the end rather than popping out',
   `${second.cameDown.samples} frames`);
 check('and the body she comes back to is her own size',
   second.reverted.scale === 1, `scale ${second.reverted.scale}`);
+check('the form can play everything the game will ask it for',
+  second.changed.plays.length === 0, second.changed.plays.join(', ') || 'all present');
 check('it runs for seven seconds', Math.abs(second.changed.remaining - 7) < 0.1,
   `${second.changed.remaining.toFixed(2)}s`);
 check('and it never holds her still — the seven seconds are hers to fight in',

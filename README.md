@@ -243,6 +243,29 @@ same rig, same clip names, same rest height, a different mesh and a bigger
 scale. Five clips rather than eight — no block, no knee, no jump — and
 `fallbacks` covers the gap.
 
+Re-texturing her goes through `npm run retexture` rather than the merge:
+
+```bash
+npm run retexture superbaola incoming/textures/superbaola.glb
+```
+
+A re-texture comes back as a *static* model — same mesh, new maps, no rig and
+no clips — so dropping it into `incoming/` and re-merging would throw the
+animations away. The maps move instead of the mesh: the rigged model keeps its
+skeleton, its weights and every clip, and only its material changes. That works
+because a re-texture is the same geometry with the same unwrap; the vertex
+counts differ a little, since rigging splits seams, but UVs do not move. The
+base colour and normal maps come across and the metallic-roughness one does
+not — taking it would override the factors the animated export set and turn a
+character that looked right into wet plastic.
+
+The proof is a render, not an argument, so look at one. There is also a check
+that the form can still play every state the game will ask it for, because a
+re-texture that came back without the clips would leave her frozen in her bind
+pose for seven seconds while every other check still passed — the damage
+numbers belong to the Fighter and have nothing to do with whether anything is
+moving.
+
 A boss is a registry entry and a gate: `{ x, count, boss: 'cart' }` on the last
 gate is what puts it there. Its size lives in the registry too, and it matters
 more than it looks — the Cart is nearly three units long, so a hit box measured
