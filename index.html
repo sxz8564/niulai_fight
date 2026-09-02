@@ -37,6 +37,17 @@
      .hidden on these would otherwise change nothing and leave the loading
      screen sitting on top of a running game. */
   #loading[hidden], #banner[hidden], #select[hidden], #bossrow[hidden] { display: none; }
+  #ragewrap[hidden], #ragelabel[hidden] { display: none; }
+
+  /* The rage meter. Narrower than the health bar and a different colour, so a
+     glance never confuses "how am I doing" with "can I do the thing yet". */
+  .bar.rage { width: min(20vw, 150px); height: 12px; border-color: #d1a0ff; }
+  .bar.rage > i { background: #8b5cf6; }
+  #ragewrap.ready .bar.rage > i { background: #ffd76a; }
+  #ragewrap.ready #ragelabel { color: #ffd76a; }
+  @keyframes charged { 50% { opacity: .45; } }
+  #ragewrap.ready { animation: charged .5s steps(1) infinite; }
+  #ragewrap { display: flex; align-items: center; gap: 8px; }
 
   /* The boss bar. A different colour from the player's so a glance tells you
      whose health you are looking at, and it flashes through the wind-up
@@ -75,6 +86,8 @@
                 color: #f4e7cf; font: inherit; font-size: 18px; border-radius: 8px;
                 touch-action: none; user-select: none; }
   #pad button:active { background: #f4e7cf; color: #2a1d16; }
+  #pad button[hidden] { display: none; }
+  #padpower { border-color: #d1a0ff; color: #d1a0ff; }
   .hint { color: #8b95a3; font-size: 12px; letter-spacing: .06em; }
   /* A keyboard makes the on-screen pad redundant, and it covers the ground. */
   @media (hover: hover) and (pointer: fine) { #pad { display: none; } }
@@ -88,6 +101,10 @@
     <span class="label" id="who">NIULAI 牛来</span>
     <span class="bar"><i id="health"></i></span>
     <span class="label" id="lives">🐮🐮🐮</span>
+    <span id="ragewrap" hidden>
+      <span class="label" id="ragelabel">RAGE</span>
+      <span class="bar rage"><i id="rage"></i></span>
+    </span>
     <span class="spacer"></span>
     <span class="label">STAGE <b id="stage">1/5</b></span>
     <span class="label">SCORE <b id="score">000000</b></span>
@@ -96,7 +113,7 @@
     <span class="label" id="bossname">THE CART 木车</span>
     <span class="bar boss"><i id="bosshealth"></i></span>
   </div>
-  <div class="row"><span class="hint">← → move · ↑ ↓ step up and down · J punch · K kick · L hold to block</span></div>
+  <div class="row"><span class="hint" id="hint">← → move · ↑ ↓ step up and down · J punch · K kick · L hold to block</span></div>
 </div>
 
 <div id="banner" hidden></div>
@@ -122,6 +139,9 @@
     <button data-action="punch" aria-label="punch">P</button>
     <button data-action="kick" aria-label="kick">K</button>
     <button data-action="block" aria-label="block">B</button>
+    <span></span>
+    <span></span>
+    <button data-action="power" aria-label="mama" id="padpower" hidden>M</button>
   </div>
 </div>
 

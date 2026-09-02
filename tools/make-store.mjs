@@ -65,22 +65,37 @@ await page.evaluate(() => {
 await page.screenshot({ path: join(out, '2-fight.png') });
 console.log('2-fight.png');
 
-// Blocking, with a wolf swinging into the guard.
+/*
+ * The super, with the herd among the wolves. This is the loudest thing the game
+ * does and the reason to pick Niulai, so it is worth a slot of its own — and it
+ * has to be caught at the moment the cows are level with the wolves rather than
+ * entering, which is a window of about a fifth of a second.
+ */
 await page.evaluate(() => {
   const api = globalThis.__niulaiFight;
   const g = api.game;
+  api.release('block');
   g.player.attackTimer = 0;
   g.player.stunTimer = 0;
-  const wolf = g.enemies[0];
-  if (wolf) {
-    wolf.root.position.set(g.player.position.x + 0.85, 0, g.player.position.z);
-    wolf.attack('punch');
-  }
-  api.press('block');
-  api.step(0.4);
+  g.player.blocking = false;
+  g.player.health = g.player.maxHealth;
+
+  // A crowd worth clearing, spread across the belt so the lanes have targets.
+  g.spawnQueue = 4;
+  g.spawnTimer = 0;
+  api.step(2.5);
+  g.enemies.forEach((wolf, i) => {
+    wolf.root.position.set(g.player.position.x + 1.4 + (i % 3) * 0.85, 0, -1.1 + i * 0.55);
+    wolf.stunTimer = 0; wolf.attackTimer = 0; wolf.thinkTimer = 99;
+  });
+  g.player.facing = 1;
+  g.power.meter = g.power.max;
+  api.press('power');
+  api.step(1.32);          // the front rank reaching the wolves, the rest still coming
+  g.onState(g.snapshot());
 });
-await page.screenshot({ path: join(out, '3-block.png') });
-console.log('3-block.png');
+await page.screenshot({ path: join(out, '3-mama.png'), animations: 'disabled' });
+console.log('3-mama.png');
 
 /*
  * The boss, caught in its wind-up. This is the one frame that says the game has
@@ -90,8 +105,6 @@ console.log('3-block.png');
 await page.evaluate(() => {
   const api = globalThis.__niulaiFight;
   const g = api.game;
-  api.release('block');
-
   // Skip to the last gate and let it open.
   for (let i = 0; i < g.gates.length - 1; i++) g.gates[i].opened = true;
   g.gateIndex = g.gates.length - 1;
@@ -211,7 +224,7 @@ const art = await tilePage.evaluate(async ({ plate, modelUrl }) => {
   const small = tile(440, 280, 40, ['A side-scrolling brawler', 'in your browser.'], 15);
   const marquee = tile(1400, 560, 104, [
     'Walk right. The screen stops. Wolves arrive.',
-    'Two fighters, five stages, and a boss that charges.'
+    'Fill the bar, shout for mama, and ten of her arrive.'
   ], 30);
 
   /*

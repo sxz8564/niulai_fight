@@ -29,7 +29,9 @@ function check(label, ok, detail = '') {
 
 const { server, url } = await serve(0);
 const browser = await chromium.launch({
-  args: ['--no-sandbox', '--enable-unsafe-swiftshader'],
+  // Muted: the suite checks that the shout decodes, not that a headless box on
+  // a machine with no sound card can open an audio device.
+  args: ['--no-sandbox', '--enable-unsafe-swiftshader', '--mute-audio'],
   executablePath: process.env.PLAYWRIGHT_CHROMIUM || undefined
 });
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
@@ -626,6 +628,226 @@ await api(() => {
   g.player.dead = false; g.player.downTimer = 0; g.player.stunTimer = 0;
 });
 
+
+/* ------------------------------------------------------------------- rage --
+ *
+ * Niulai's super. The meter is a promise: being surrounded, which the ordinary
+ * moveset has no answer to, eventually pays for itself. The checks below are
+ * that promise taken apart — does it fill from both halves of a fight, does it
+ * refuse to fire early, does firing it actually clear a screen, and does the
+ * second it costs come with the protection that makes spending it worth doing.
+ */
+
+/* Puts wolves on the field wherever the player is standing. */
+await api(() => {
+  globalThis.__wolves = (n, spread = 0.7) => {
+    const g = globalThis.__niulaiFight.game;
+    for (const e of g.enemies) g.scene.remove(e.root);
+    g.enemies = [];
+    g.boss = null;
+    g.spawnQueue = 0;
+    for (let i = 0; i < n; i++) {
+      const wolf = g.spawnFighter('wolfwolf', {
+        x: g.player.position.x + 1.5 + i * 0.8,
+        z: -1.2 + i * spread
+      }, { health: 34, speed: 2.5, damage: 8, team: 'enemy', facing: -1 });
+      wolf.thinkTimer = 99;      // no swinging back: this is about the herd
+      g.enemies.push(wolf);
+    }
+    return g.enemies.length;
+  };
+});
+
+const meter = await api(() => {
+  const g = globalThis.__niulaiFight.game;
+  const p = g.power;
+  globalThis.__wolves(1);
+  p.meter = 0;
+
+  // Landing a hit.
+  const wolf = g.enemies[0];
+  wolf.root.position.set(g.player.position.x + 0.6, 0, g.player.position.z);
+  wolf.health = 34; wolf.dead = false; wolf.stunTimer = 0; wolf.invulnerable = 0;
+  g.player.facing = 1;
+  g.player.attackTimer = 0; g.player.stunTimer = 0; g.player.blocking = false;
+  g.buffered = null;
+  globalThis.__niulaiFight.press('punch');
+  globalThis.__niulaiFight.step(g.player.timings.punch + 0.2);
+  const fromHitting = p.meter;
+
+  // Taking one.
+  p.meter = 0;
+  g.player.health = g.player.maxHealth;
+  g.player.dead = false; g.player.downTimer = 0; g.player.stunTimer = 0;
+  g.player.invulnerable = 0;
+  g.player.blocking = false;
+  g.player.takeHit(8, -1);
+  // takeHit is what the game calls; the meter is credited by resolveHits, so
+  // drive it the way the game does rather than reaching past it.
+  p.meter = 0;
+  g.player.invulnerable = 0;
+  wolf.root.position.set(g.player.position.x + 0.55, 0, g.player.position.z);
+  wolf.facing = -1; wolf.thinkTimer = 0; wolf.stunTimer = 0; wolf.attackTimer = 0;
+  wolf.health = 34; wolf.dead = false; wolf.downTimer = 0;
+  for (let i = 0; i < 30 && p.meter === 0; i++) {
+    g.player.health = g.player.maxHealth;
+    g.player.dead = false; g.player.downTimer = 0; g.player.stunTimer = 0;
+    g.player.invulnerable = 0;
+    wolf.thinkTimer = 0;
+    globalThis.__niulaiFight.step(0.25);
+  }
+  const fromBeingHit = p.meter;
+  return { fromHitting, fromBeingHit, max: p.max };
+});
+check('landing a hit builds rage', meter.fromHitting > 0, `+${meter.fromHitting}`);
+check('and so does taking one', meter.fromBeingHit > 0, `+${meter.fromBeingHit}`);
+check('being hit is worth more than hitting', meter.fromBeingHit > meter.fromHitting,
+  `${meter.fromBeingHit} against ${meter.fromHitting}`);
+
+/* It must refuse to fire on an empty meter, or the meter is decoration. */
+const early = await api(() => {
+  const g = globalThis.__niulaiFight.game;
+  g.power.meter = g.power.max - 1;
+  g.player.attackTimer = 0; g.player.stunTimer = 0; g.player.downTimer = 0;
+  g.player.dead = false; g.player.blocking = false;
+  const fired = g.power.cast(g.player);
+  return { fired, ready: g.power.ready, casting: g.power.casting };
+});
+check('the super will not fire on a meter that is not full', !early.fired && early.casting === 0);
+
+/*
+ * A full meter, spent. Everything the move promises, in one go: it empties the
+ * meter, plants him in the summon pose, and puts ten of them on the field.
+ */
+const cast = await api(() => {
+  const g = globalThis.__niulaiFight.game;
+  const p = g.power;
+  globalThis.__wolves(5);
+  const before = g.enemies.map((e) => e.health);
+  p.meter = p.max;
+  g.player.attackTimer = 0; g.player.stunTimer = 0; g.player.downTimer = 0;
+  g.player.dead = false; g.player.blocking = false;
+  g.buffered = null;
+
+  globalThis.__niulaiFight.press('power');
+  globalThis.__niulaiFight.step(0.05);
+  const casting = { on: p.casting > 0, meter: p.meter, pose: g.player.pose };
+
+  // Halfway through the cast the herd should be out.
+  globalThis.__niulaiFight.step(0.5);
+  const herd = p.herd.length;
+  const startX = p.herd.map((cow) => cow.actor.root.position.x);
+  const lanes = new Set(p.herd.map((cow) => cow.actor.root.position.z.toFixed(2))).size;
+
+  // Untouchable while he is stood there.
+  const hp = g.player.health;
+  g.player.takeHit(30, -1);
+  const tookDamage = g.player.health < hp;
+
+  globalThis.__niulaiFight.step(2.6);
+  const endX = p.herd.map((cow, i) => cow.actor.root.position.x - startX[i]);
+  return {
+    casting, herd, lanes, tookDamage,
+    ranAllOneWay: endX.every((d) => d > 0),
+    left: p.herd.length,
+    before,
+    after: g.enemies.map((e) => e.health),
+    alive: g.enemies.filter((e) => !e.dead && e.health > 0).length,
+    pose: g.player.pose,
+    casts: p.casts
+  };
+});
+check('the super fires when the meter is full and empties it',
+  cast.casting.on && cast.casting.meter === 0, `meter ${cast.casting.meter}`);
+check('he is locked in the summon pose while it goes off',
+  cast.casting.pose === 'summon', cast.casting.pose);
+check('ten mamas arrive', cast.herd === 10, `${cast.herd} of them`);
+check('in parallel lines rather than one', cast.lanes >= 4, `${cast.lanes} lanes`);
+check('all of them run the same way, left to right', cast.ranAllOneWay);
+check('nothing can touch him mid-summon', !cast.tookDamage);
+check('the stampede runs over every wolf in its path', cast.alive === 0,
+  `${cast.before.length} wolves, ${cast.alive} still standing`);
+check('the summon pose is let go when the cast ends', cast.pose === null, String(cast.pose));
+check('the herd clears itself off the field', cast.left === 0, `${cast.left} left in the scene`);
+
+/*
+ * The shout has to be a format the browser will actually decode.
+ *
+ * The first cut of this shipped the m4a as supplied, which plays in Chrome and
+ * does not play in Chromium — no AAC in the open build — so the move was silent
+ * for anyone not on Google's binary, and nothing here would have said so. It is
+ * Opus in WebM now, and this is the check that keeps it that way.
+ */
+const shout = await api(async () => {
+  const audio = globalThis.__niulaiFight.game.power.shout;
+  if (!audio) return { missing: true };
+  await new Promise((resolve) => {
+    if (audio.readyState >= 1) return resolve();
+    audio.addEventListener('loadedmetadata', resolve, { once: true });
+    audio.addEventListener('error', resolve, { once: true });
+    setTimeout(resolve, 5000);
+  });
+  return {
+    src: audio.src.split('/').slice(-2).join('/'),
+    readyState: audio.readyState,
+    duration: audio.duration,
+    error: audio.error ? audio.error.code : null
+  };
+});
+check('the shout is a format the browser can decode',
+  !shout.missing && shout.error === null && shout.duration > 0,
+  `${shout.src} — ${shout.duration ? shout.duration.toFixed(2) + 's' : 'no audio'}` +
+  `${shout.error ? `, media error ${shout.error}` : ''}`);
+
+/* And the bar itself, which only exists for a fighter that has a super. */
+const bar = await page.evaluate(() => {
+  const wrap = document.getElementById('ragewrap');
+  return { hidden: wrap.hidden, label: document.getElementById('ragelabel').textContent };
+});
+check('the rage bar is on screen for a fighter that has a super', !bar.hidden, bar.label);
+
+/*
+ * And against something wide. The Cart spans several lanes at once, so several
+ * cows reach it on the same frame — which is the case the herd's disregard for
+ * invulnerability frames exists for, and the only case where it changes
+ * anything. Letting the first cow's i-frames swallow the rest costs two thirds
+ * of the move's damage against the one enemy it is most needed against.
+ */
+const trampled = await api(() => {
+  const g = globalThis.__niulaiFight.game;
+  const boss = globalThis.__toBoss();
+  const f = boss.fighter;
+  f.position.set(g.player.position.x + 2.2, 0, 0);
+  boss.enter('stalk');
+  boss.timer = 99;
+  f.health = f.maxHealth;
+  f.invulnerable = 0;
+  g.power.meter = g.power.max;
+  g.player.attackTimer = 0; g.player.stunTimer = 0; g.player.downTimer = 0;
+  g.player.dead = false; g.player.blocking = false;
+  const before = f.health;
+  globalThis.__niulaiFight.press('power');
+  globalThis.__niulaiFight.step(4);
+  const damage = before - f.health;
+  return { damage, cows: damage / (g.power.spec.damage || 18) };
+});
+check('several of them hit the boss at once, because it is wide enough for that',
+  trampled.cows >= 4, `${trampled.cows.toFixed(0)} cows landed, ${trampled.damage} damage`);
+
+await api(() => {
+  const g = globalThis.__niulaiFight.game;
+  g.over = false; g.won = false;
+  g.gateIndex = 0;
+  for (const gate of g.gates) gate.opened = false;
+  for (const e of g.enemies) g.scene.remove(e.root);
+  g.enemies = []; g.boss = null; g.spawnQueue = 0;
+  g.power.clear();
+  g.power.meter = 0;
+  g.player.position.set(0, 0, 0.2);
+  g.player.health = g.player.maxHealth;
+  g.player.dead = false; g.player.downTimer = 0; g.player.stunTimer = 0;
+});
+
 /*
  * Baola is the other hero. Loading her is the check that a second playable
  * character is a registry entry rather than a code change — and that the clip
@@ -646,6 +868,8 @@ const second = await page.evaluate(async () => {
     chinese: snap.playerNameChinese,
     health: snap.maxHealth,
     speed: baola.player.speed,
+    power: baola.power,
+    rage: snap.rage,
     missing
   };
 });
@@ -654,6 +878,11 @@ check('Baola has a clip for every state', second.missing.length === 0,
   second.missing.join(', ') || 'all present');
 check('the two heroes are not identical', second.speed !== 4.1 || second.health !== 100,
   `Baola: ${second.health} hp, speed ${second.speed}`);
+/* Her super is not designed yet, and a bar that fills and does nothing is a
+ * worse promise than no bar. The registry is what decides, so this is really a
+ * check that it does. */
+check('Baola has no rage meter, because her super is not designed yet',
+  second.power === null && second.rage === null);
 
 /*
  * Restarting. The interesting part is not that a new game appears — it is that

@@ -11,7 +11,12 @@ import { fileURLToPath } from 'node:url';
  *   incoming/niulai/*.glb    -> assets/models/niulai-rigged.glb
  *   incoming/wolfwolf/*.glb  -> assets/models/wolfwolf-rigged.glb
  *
- *   node tools/merge-animations.mjs
+ *   node tools/merge-animations.mjs            all of them
+ *   node tools/merge-animations.mjs niulai     just that one
+ *
+ * Naming the characters matters once a character is finished: re-exporting one
+ * that has not changed still writes a byte-different .glb, and a diff full of
+ * megabytes nobody altered hides the one that was.
  *
  * Meshy exports one file per animation and puts the whole skinned mesh in each
  * of them, so five animations arrive as five copies of the same 5 MB
@@ -43,6 +48,10 @@ const outDir = join(root, 'assets/models');
 
 /** The clip a Meshy filename is really describing, mapped to a game state. */
 const NAMING = [
+  // Order matters throughout. These two go first because "Charged_Spell_Cast"
+  // and "Bow_Charge" both contain words the later rules look for.
+  { match: /Charged_Spell_Cast|Spell_Cast|Summon/i, name: 'summon' },
+  { match: /Bow_Charge|Charge_Left_Hand/i, name: 'charge' },
   { match: /Prep_Straight_Punch/i, name: 'punch' },
   { match: /Right_Straight_Kick/i, name: 'kick' },
   { match: /Step_Knee_Strike/i, name: 'knee' },
@@ -79,12 +88,20 @@ function clipNameFor(file) {
  */
 const ROOT_RISE = { down: 0.3 };
 
-/* Each subfolder of incoming/ is one character. */
-const characters = readdirSync(inbox, { withFileTypes: true })
+/* Each subfolder of incoming/ is one character. Named ones only, if any. */
+const wanted = process.argv.slice(2);
+const found = readdirSync(inbox, { withFileTypes: true })
   .filter((entry) => entry.isDirectory())
   .map((entry) => entry.name)
   .sort();
+const characters = wanted.length ? found.filter((name) => wanted.includes(name)) : found;
 
+for (const name of wanted) {
+  if (!found.includes(name)) {
+    console.error(`No folder ${inbox}/${name}`);
+    process.exit(1);
+  }
+}
 if (!characters.length) {
   console.error(`No character folders in ${inbox}. Expected e.g. ${inbox}/niulai/*.glb`);
   process.exit(1);

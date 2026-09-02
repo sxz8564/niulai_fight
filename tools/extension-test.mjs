@@ -49,6 +49,18 @@ for (const match of html.matchAll(/(?:src|href)="([^"]+)"/g)) {
 const manifest = JSON.parse(readFileSync(join(root, 'manifest.json'), 'utf8'));
 referenced.push(manifest.background.service_worker, ...Object.values(manifest.icons));
 
+/*
+ * The registry names files too, and nothing in the HTML or the manifest
+ * mentions them: the models, and the audio for a character's super. A typo in
+ * a path there fails at the moment the move is used rather than at load, which
+ * is the worst possible time to find out.
+ */
+const registry = JSON.parse(readFileSync(join(root, 'assets/models/index.json'), 'utf8'));
+for (const spec of registry) {
+  if (spec.file) referenced.push(`assets/models/${spec.file}`);
+  if (spec.power && spec.power.shout) referenced.push(`assets/${spec.power.shout}`);
+}
+
 const absent = referenced.filter((file) => !existsSync(join(root, file)));
 check('every file the extension references exists', absent.length === 0,
   absent.length ? `missing: ${absent.join(', ')}` : `${referenced.length} checked`);
@@ -61,6 +73,7 @@ const context = await chromium.launchPersistentContext(profile, {
   args: [
     '--no-sandbox',
     '--enable-unsafe-swiftshader',
+    '--mute-audio',
     `--disable-extensions-except=${root}`,
     `--load-extension=${root}`
   ]
@@ -132,6 +145,59 @@ const played = await page.evaluate(() => {
 check('the player walks and wolves appear', played.walked.x > 3 && played.walked.enemies > 0,
   `x=${played.walked.x.toFixed(1)}, ${played.walked.enemies} wolves`);
 check('a punch connects inside the extension', played.punched);
+
+/*
+ * The super, from inside the extension. Two things can only fail here: the
+ * shout being a file the extension cannot serve or the browser cannot decode,
+ * and the herd being models fetched at a moment the CSP has an opinion about.
+ */
+const superMove = await page.evaluate(async () => {
+  const api = globalThis.__niulaiFight;
+  const g = api.game;
+  const audio = g.power && g.power.shout;
+  if (audio) {
+    await new Promise((resolve) => {
+      if (audio.readyState >= 1) return resolve();
+      audio.addEventListener('loadedmetadata', resolve, { once: true });
+      audio.addEventListener('error', resolve, { once: true });
+      setTimeout(resolve, 5000);
+    });
+  }
+  const player = g.player;
+  player.health = player.maxHealth;
+  player.dead = false;
+  player.downTimer = 0; player.stunTimer = 0; player.attackTimer = 0;
+  player.blocking = false;
+  g.buffered = null;
+  g.power.meter = g.power.max;
+  api.press('power');
+  api.step(0.6);
+  return {
+    herd: g.power.herd.length,
+    audio: audio ? {
+      readyState: audio.readyState,
+      duration: audio.duration,
+      error: audio.error && audio.error.code,
+      // The direct question, independent of whether anything has buffered yet.
+      supported: audio.canPlayType('audio/webm; codecs=opus')
+    } : null
+  };
+});
+/*
+ * Decodable, not buffered. readyState climbs with the network, and a muted
+ * element in a headless browser may sit at HAVE_METADATA for ever — but a
+ * duration means the container and the codec were both understood, and that is
+ * the thing that was actually broken when this shipped as AAC.
+ */
+check('the shout decodes from chrome-extension://',
+  superMove.audio && superMove.audio.error === null && superMove.audio.duration > 0,
+  superMove.audio
+    ? `${superMove.audio.duration ? superMove.audio.duration.toFixed(2) + 's' : 'no duration'}, ` +
+      `readyState ${superMove.audio.readyState}` +
+      `${superMove.audio.error ? `, media error ${superMove.audio.error}` : ''}`
+    : 'no audio element');
+check('the super summons its herd inside the extension', superMove.herd === 10,
+  `${superMove.herd} mamas`);
 
 await page.screenshot({ path: join(shots, '4-extension.png') });
 check('no errors while running as an extension', errors.length === 0, errors[0] || '');

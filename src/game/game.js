@@ -3,6 +3,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { createActor } from './actor.js';
 import { Fighter, separate } from './fighter.js';
 import { Boss } from './boss.js';
+import { Power } from './power.js';
 import { buildStage, clampToBelt, BELT_NEAR, BELT_FAR, STAGE_END } from './stage.js';
 import { createInput } from './input.js';
 
@@ -38,6 +39,9 @@ export class Game {
     this.onState = options.onState || (() => {});
     this.enemies = [];
     this.boss = null;
+    this.power = null;          // set in load(), if the chosen hero has one
+    this.beltNear = BELT_NEAR;
+    this.beltFar = BELT_FAR;
     this.gates = GATES.map((gate) => ({ ...gate }));
     this.gateIndex = 0;
     this.score = 0;
@@ -105,6 +109,13 @@ export class Game {
     this.player = this.spawnFighter(this.playerId, { x: 0, z: 0.2 }, {
       ...(hero.stats || { health: 100, speed: 4.1, damage: 12 }), team: 'player'
     });
+    /*
+     * A super is a registry entry, like everything else about a character. A
+     * hero with no `power` block gets no meter, no bar and no key — which is
+     * the honest way to ship a roster where one fighter's super is finished and
+     * the other's is not, rather than a bar that fills and does nothing.
+     */
+    if (hero.power) this.power = new Power(hero.power, this);
     this.onState(this.snapshot());
     return this;
   }
@@ -157,6 +168,7 @@ export class Game {
       this.driveEnemy(enemy, dt);
     }
     if (this.boss) this.boss.update(dt, this.player);
+    if (this.power) this.power.update(dt, this.player, this.enemies);
 
     this.player.update(dt);
     for (const enemy of this.enemies) enemy.update(dt);
@@ -191,7 +203,24 @@ export class Game {
       if (p.downTimer <= 0) this.loseLife();
       return;
     }
+
+    /*
+     * Mid-summon he is a statue: feet planted, no steering, no swinging. The
+     * second it costs is what the move is paid for with, and letting the player
+     * walk out of it would make a screen-clearing attack free.
+     */
+    if (this.power && this.power.casting > 0) {
+      p.velocity.set(0, 0, 0);
+      p.blocking = false;
+      this.buffered = null;
+      return;
+    }
+
     if (!p.canAct) { p.blocking = false; return; }
+
+    if (this.input.consume('power') && this.power) {
+      if (this.power.cast(p)) return;
+    }
 
     /*
      * Blocking is held, and it costs you everything else: no moving, no
@@ -278,18 +307,22 @@ export class Game {
           enemy.takeHit(this.player.damage, this.player.facing);
           this.player.hasLanded = true;
           this.score += 100;
+          if (this.power) this.power.gain('dealt');
           break;    // one target per swing, like the originals
         }
       }
     }
     for (const enemy of this.enemies) {
       if (enemy.striking && enemy.inRange(this.player)) {
-        if (this.player.takeHit(enemy.damage, enemy.facing)) enemy.hasLanded = true;
+        if (this.player.takeHit(enemy.damage, enemy.facing)) {
+          enemy.hasLanded = true;
+          if (this.power) this.power.gain('taken');
+        }
       }
     }
     // The Cart does not swing at anything; it runs you over. That is contact
     // damage, not a strike, so it is tested by overlap rather than by frames.
-    if (this.boss) this.boss.ram(this.player);
+    if (this.boss && this.boss.ram(this.player) && this.power) this.power.gain('taken');
   }
 
   collide() {
@@ -321,6 +354,7 @@ export class Game {
     for (const enemy of gone) {
       this.scene.remove(enemy.root);
       this.score += 400;
+      if (this.power) this.power.gain('killed');
     }
     if (this.boss && this.boss.fighter.dead) this.boss = null;
     this.enemies = this.enemies.filter((e) => !e.dead);
@@ -436,6 +470,13 @@ export class Game {
       stages: this.gates.length,
       over: this.over,
       won: this.won,
+      rage: this.power ? {
+        name: this.power.spec.name,
+        nameChinese: this.power.spec.nameChinese || '',
+        fraction: this.power.fraction,
+        ready: this.power.ready,
+        casting: this.power.casting > 0
+      } : null,
       boss: this.boss && !this.boss.fighter.dead ? {
         name: this.bossSpec.name,
         nameChinese: this.bossSpec.nameChinese || '',
@@ -463,6 +504,7 @@ export class Game {
    * give its one back or a few restarts will exhaust them.
    */
   dispose() {
+    if (this.power) this.power.clear();
     this.input.dispose();
     this.scene.traverse((node) => {
       if (node.geometry) node.geometry.dispose();

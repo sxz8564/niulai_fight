@@ -26,6 +26,11 @@ const hud = {
   stage: document.getElementById('stage'),
   banner: document.getElementById('banner'),
   who: document.getElementById('who'),
+  hint: document.getElementById('hint'),
+  rageWrap: document.getElementById('ragewrap'),
+  rageLabel: document.getElementById('ragelabel'),
+  rage: document.getElementById('rage'),
+  padPower: document.getElementById('padpower'),
   bossRow: document.getElementById('bossrow'),
   bossName: document.getElementById('bossname'),
   bossHealth: document.getElementById('bosshealth')
@@ -40,6 +45,23 @@ function paint(state) {
   hud.lives.textContent = '🐮'.repeat(Math.max(0, state.lives));
   hud.score.textContent = String(state.score).padStart(6, '0');
   hud.stage.textContent = `${state.stage}/${state.stages}`;
+
+  /*
+   * The rage meter, and the key that spends it, both appear only for a fighter
+   * that has a super. Baola's is not designed yet, so she gets neither — a bar
+   * that fills and does nothing is a worse promise than no bar.
+   */
+  const rage = state.rage;
+  hud.rageWrap.hidden = !rage;
+  hud.padPower.hidden = !rage;
+  if (rage) {
+    hud.rageLabel.textContent = rage.ready ? `${rage.name} READY` : rage.name;
+    hud.rage.style.width = `${rage.fraction * 100}%`;
+    hud.rageWrap.classList.toggle('ready', rage.ready);
+    hud.padPower.textContent = rage.name.slice(0, 1);
+  }
+  hud.hint.textContent = '← → move · ↑ ↓ step up and down · J punch · K kick · ' +
+    'L hold to block' + (rage ? ` · M ${rage.name} when the bar is full` : '');
 
   /*
    * The boss bar only exists while there is a boss. Its wind-up gets its own

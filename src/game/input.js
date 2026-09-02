@@ -13,6 +13,9 @@ const KEYS = {
   ArrowDown: 'down', KeyS: 'down',
   KeyJ: 'punch', Space: 'punch',
   KeyK: 'kick',
+  // The super. M for mama, which is what it makes him shout — a key nobody has
+  // to be told twice. U sits above J for anyone already on the punch row.
+  KeyM: 'power', KeyU: 'power',
   // Block is held rather than tapped, so it gets keys that are comfortable to
   // hold down while still steering with the other hand.
   KeyL: 'block', ShiftLeft: 'block', ShiftRight: 'block'

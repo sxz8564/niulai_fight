@@ -14,6 +14,7 @@ const TYPES = {
   '.json': 'application/json; charset=utf-8',
   '.glb': 'model/gltf-binary',
   '.webp': 'image/webp',
+  '.webm': 'audio/webm',
   '.png': 'image/png',
   '.css': 'text/css; charset=utf-8'
 };

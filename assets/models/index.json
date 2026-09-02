@@ -49,13 +49,19 @@
       "block": {
         "clip": "block",
         "loop": false
+      },
+      "summon": {
+        "clip": "summon",
+        "from": 1.6,
+        "to": 2.6
       }
     },
     "timings": {
       "punch": 0.45,
       "kick": 0.38,
       "hit": 0.34,
-      "down": 1.25
+      "down": 1.25,
+      "summon": 1.0
     },
     "_spares": "hurdle, backjump and jump are merged and trimmed but not bound to anything: jumping needs an air state first. knee is an obvious heavy attack whenever a third button is wanted.",
     "playable": true,
@@ -64,6 +70,24 @@
       "health": 100,
       "speed": 4.1,
       "damage": 12
+    },
+    "power": {
+      "name": "MAMA",
+      "nameChinese": "妈妈",
+      "_comment": "Niulai's super. The meter fills from hitting and from being hit, and spends itself on one shout: ten mamas across the whole stage. Cast is how long he is locked in the summon pose; release is how far into it the herd arrives — timed to the frame his arms go up, because a summon whose effect precedes the gesture reads as a bug.",
+      "cast": 1.0,
+      "release": 0.45,
+      "shout": "audio/mama.webm",
+      "summon": "mama",
+      "count": 10,
+      "lanes": 5,
+      "speed": 15.0,
+      "damage": 18,
+      "gain": {
+        "dealt": 7,
+        "taken": 12,
+        "killed": 10
+      }
     }
   },
   {
@@ -213,6 +237,31 @@
       "health": 220,
       "speed": 2.1,
       "damage": 34
+    }
+  },
+  {
+    "id": "mama",
+    "name": "Mama",
+    "nameChinese": "妈妈",
+    "file": "mama-rigged.glb",
+    "role": "summon",
+    "animated": true,
+    "scale": 0.588,
+    "_comment": "One clip and one job: run left to right through everything. She is not a Fighter — she has no health, cannot be hit and does not collide with anyone. The fallbacks below point every state the actor knows about at the only clip she has, so nothing has to special-case an actor with a vocabulary of one.",
+    "clips": {
+      "walk": {
+        "clip": "charge",
+        "loop": true,
+        "gait": 1.0
+      }
+    },
+    "fallbacks": {
+      "idle": "walk",
+      "punch": "walk",
+      "kick": "walk",
+      "hit": "walk",
+      "down": "walk",
+      "block": "walk"
     }
   }
 ]

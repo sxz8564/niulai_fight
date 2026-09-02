@@ -4,6 +4,8 @@ A belt-scrolling brawler in the shape of the Famicom ones: walk right, the
 screen stops, wolves arrive, clear them, the screen lets you on. Two fighters
 to pick from — Niulai 牛来 and Baola 豹拉 — against Wolfwolf, who comes in
 packs, through woods and grassland, and the Cart 木车 waiting at the end of it.
+When Niulai has taken enough and given enough, he calls his mother, and ten of
+her come through the field.
 
 Runs as a Chrome extension. Click the toolbar button and it opens in a tab.
 
@@ -12,6 +14,8 @@ Runs as a Chrome extension. Click the toolbar button and it opens in a tab.
 ![Baola between two wolves in the woods](docs/screenshot.png)
 
 ![The Cart rearing back to charge](docs/boss.png)
+
+![Ten mamas stampeding through a line of wolves](docs/mama.png)
 
 ## Playing it
 
@@ -26,6 +30,7 @@ Pick a fighter first. **Niulai** is steady — more health, hits harder.
 | **J** or **Space** | punch |
 | **K** | kick |
 | **L** or **Shift** (hold) | block |
+| **M** or **U** | MAMA — Niulai only, when the rage bar is full |
 | **R** (when it ends) | play again |
 | **C** (when it ends) | choose a different fighter |
 
@@ -41,6 +46,31 @@ offence.
 Stepping up and down is not decoration. An attack only lands if you are close
 in X *and* nearly level in Z, so a wolf standing a metre upstage cannot hit you
 and you cannot hit it. Circling is how you fight three at once.
+
+## Rage, and mama
+
+Niulai has a meter. It fills from **both** halves of a fight — seven for landing
+a hit, twelve for taking one, ten for finishing a wolf — and when it is full,
+**M** spends the lot.
+
+He plants his feet, shouts for his mother, and ten of her come through the stage
+in five parallel lines, running everything down. Every enemy in a lane is hit
+once per cow that reaches it, which clears a screen of wolves outright and takes
+about half the Cart's health, since the Cart is wide enough for several lanes to
+find it at once.
+
+The weighting is the design. Rewarding only aggression would withhold the button
+from the player who is losing, which is exactly who needs it; rewarding only
+damage taken would make the move a consolation prize. Both, tilted toward being
+hit, means a bad exchange is still progress toward a good one. The second he
+spends standing still is what it costs — and he is untouchable for that second,
+because a super that a stray wolf can cancel is a super nobody uses when they
+are surrounded, which is the only time it is worth using.
+
+**Baola has no meter and no key.** Her super is not designed yet, and a bar that
+fills and does nothing is a worse promise than no bar. It is a registry entry:
+give a character a `power` block and the bar, the key and the pad button all
+appear.
 
 ## The Cart
 
@@ -104,6 +134,26 @@ it — and `updateProp` in `actor.js` writes the motion. It still goes through
 the same `play()` and `update()` as everything else, so nothing outside that
 file knows which kind of actor it got.
 
+**Mama is a rig with one clip.** She has no health, cannot be hit, and collides
+with nothing — she is not a Fighter at all, just an actor that runs in a
+straight line. `fallbacks` in the registry points every state the actor knows
+about at the only clip she has, so nothing has to special-case an actor with a
+vocabulary of one.
+
+`npm run models` takes character names now, and it is worth using them:
+re-exporting a character that has not changed still writes a byte-different
+`.glb`, and a diff full of megabytes nobody altered hides the one that was.
+
+The shout is **Opus in WebM**, not the m4a it arrived as. AAC plays in Chrome
+and does not play in Chromium — no proprietary codecs in the open build — so the
+move was silent for anyone not on Google's binary, and nothing said so. Both
+test suites now check that the file has a duration, which is what "the browser
+understood the container and the codec" looks like from JavaScript:
+
+```bash
+ffmpeg -i mama.m4a -vn -af "volume=10dB" -c:a libopus -b:a 64k -ac 1 assets/audio/mama.webm
+```
+
 Adding a fighter is a registry entry, not a code change: give it `playable:
 true`, its clip trims and its stats, and it appears on the select screen with a
 portrait rendered from the model itself. Baola went in that way, and reuses
@@ -147,6 +197,14 @@ holds you until the wave is dead, that a punch damages a wolf, that enough
 punches finish one, that a wolf can hurt you, that clearing opens the gate, and
 that a punch misses someone standing further up the belt.
 
+The super gets its own set too: that the meter fills from hitting and from being
+hit, that it will not fire early, that firing it empties the meter and plants
+him in the summon pose, that ten of them arrive in parallel lines and all run
+the same way, that nothing can touch him mid-summon, that a screen of wolves
+does not survive it, that several of them land on the Cart at once because it is
+wide enough for that, that the herd clears itself off the field, that the shout
+is in a format the browser can decode — and that Baola has none of it.
+
 The boss gets its own set, and each one is the same question from a different
 side — is its one attack answerable? That it pauses before it charges and does
 not creep during the pause; that the charge holds its lane and is much faster
@@ -173,7 +231,9 @@ src/
 └── game/
     ├── game.js        waves, gates, camera, the rules
     ├── fighter.js     health, hitstun, knockdown — shared by player and wolves
-    ├── actor.js       head + body, and the swap-in point for a rigged model
+    ├── boss.js        the Cart: stalk, wind up, charge, stall
+    ├── power.js       the rage meter and what it summons
+    ├── actor.js       rigged models, props, and the placeholder body
     ├── stage.js       ground, trees, the painted backdrop
     └── input.js       keyboard and touch
 ```

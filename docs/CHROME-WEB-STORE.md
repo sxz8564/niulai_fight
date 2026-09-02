@@ -25,8 +25,8 @@ and the only thing that survives is a silhouette.
 The line under the title in search results. End-user copy — plain words, no
 jargon. This lives in `manifest.json`.
 
-> A side-scrolling brawler in a browser tab. Pick a fighter, walk right through
-> five stages of wolves, and face the Cart.
+> A side-scrolling brawler in a browser tab. Punch through five stages of
+> wolves, call your mother, and face the Cart.
 
 ### Description
 
@@ -40,8 +40,16 @@ will see and do, not how it is built.
 >
 > Two fighters
 >
-> • Niulai 牛来, steady: more health, hits harder.
+> • Niulai 牛来, steady: more health, hits harder, and he can call his mother.
 > • Baola 豹拉, quick: faster on her feet, easier to hurt.
+>
+> Call your mother
+>
+> Niulai's rage bar fills from both halves of a fight — from landing hits and
+> from taking them. Fill it and one key spends the lot: he plants his feet,
+> shouts for his mother, and ten of her come through the field in parallel
+> lines and run down everything in them. It clears a screen of wolves outright,
+> and it is the best second you will spend on the Cart.
 >
 > How it plays
 >
@@ -75,16 +83,16 @@ dashboard accepts.
 | Field | File | Size |
 | --- | --- | --- |
 | Store icon | `icon-128.png` | 128 x 128 |
-| Screenshots | `2-fight.png`, `4-boss.png`, `1-select.png`, `3-block.png`, `5-again.png` | 1280 x 800 |
+| Screenshots | `2-fight.png`, `3-mama.png`, `4-boss.png`, `1-select.png`, `5-again.png` | 1280 x 800 |
 | Small promo tile | `promo-440x280.png` | 440 x 280 |
 | Marquee promo tile | `promo-1400x560.png` | 1400 x 560 |
 
 Upload the screenshots in the order listed — five, which is the most the store
 accepts. It shows the first one largest, and a fight is a better first
-impression than a menu. The boss goes second: it is the thing that says the game
-has an ending, and the Cart reared back mid-tell is the most legible frame in
-it. The select screen is third, because two characters is a reason to install
-rather than a detail.
+impression than a menu. The stampede goes second because it is the loudest thing
+in the game and nothing else on the page looks like it; the boss third, because
+it is what says the game has an ending. The select screen comes after those:
+two characters is a reason to install, but it is a quieter one.
 
 The marquee is optional and only matters if the store ever features the
 extension. It costs nothing to supply and a listing without one looks
@@ -109,8 +117,8 @@ no `permissions` and no `host_permissions`. If the form insists on something:
 
 **Remote code** — answer **No, I am not using remote code**. If a box appears:
 
-> All JavaScript, the 3D models and the artwork are packaged inside the
-> extension. It makes no network requests of any kind and evaluates no code
+> All JavaScript, the 3D models, the audio and the artwork are packaged inside
+> the extension. It makes no network requests of any kind and evaluates no code
 > fetched at runtime.
 
 **Data usage** — leave every collected-data category unticked and certify all
@@ -140,6 +148,9 @@ rejection.
       first.
 - [ ] The name is 22 characters, well inside the 45 the store allows, so it
       will display in full everywhere.
+- [ ] Nothing about the answers above changes when the game gains sound: the
+      audio is a file inside the package, played by the page. No permission, no
+      network, no new data of any kind.
 
 ## A note on the artwork
 

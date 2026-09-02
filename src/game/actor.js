@@ -20,6 +20,14 @@ import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js
 export const STATES = ['idle', 'walk', 'punch', 'kick', 'hit', 'down', 'block'];
 
 /*
+ * States built only when the registry names a clip for them, and never
+ * reported as missing when it does not. A character without a super is not an
+ * incomplete character, so a list of "missing" clips that always includes
+ * `summon` for everyone but Niulai would be noise rather than a gap.
+ */
+export const OPTIONAL_STATES = ['summon'];
+
+/*
  * The states a prop understands. A vehicle has no rig and no clips, so its
  * motion is written here — but it is still asked for by name through the same
  * `play()` every other actor uses, so nothing outside this file knows the
@@ -254,11 +262,13 @@ export function createActor(spec, gltf) {
     actions = {};
     missing = [];
 
-    for (const state of STATES) {
+    for (const state of [...STATES, ...OPTIONAL_STATES]) {
+      const optional = !STATES.includes(state);
+      if (optional && !(spec.clips && spec.clips[state])) continue;
       const entry = (spec.clips && spec.clips[state]) || state;
       const config = typeof entry === 'string' ? { clip: entry } : entry;
       const source = THREE.AnimationClip.findByName(gltf.animations, config.clip || state);
-      if (!source) { missing.push(state); continue; }
+      if (!source) { if (!optional) missing.push(state); continue; }
 
       let clip = source;
       if (config.from != null || config.to != null) {
