@@ -61,7 +61,7 @@ once per cow that reaches it, which clears a screen of wolves outright and takes
 about half the Cart's health, since the Cart is wide enough for several lanes to
 find it at once.
 
-They cross at 2.75 units a second — slower than the hero walks, and slow enough
+They cross at 3.25 units a second — slower than the hero walks, and slow enough
 to watch, which for the one spectacle in the game is the point. Their legs
 follow: the gallop is scaled by how fast the herd is actually travelling against
 the speed the clip was authored for, so slowing it down does not turn it into

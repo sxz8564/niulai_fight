@@ -107,7 +107,7 @@ await page.evaluate(() => {
   api.press('power');
   api.step(0.1);
   if (g.power.casting <= 0) throw new Error('the super did not fire — nothing to photograph');
-  api.step(4.3);           // the front rank reaching the wolves, the rest still coming
+  api.step(3.6);           // the front rank reaching the wolves, the rest still coming
   g.onState(g.snapshot());
 });
 await page.screenshot({ path: join(out, '3-mama.png'), animations: 'disabled' });

@@ -86,7 +86,7 @@
       "summon": "mama",
       "count": 10,
       "lanes": 5,
-      "speed": 2.75,
+      "speed": 3.25,
       "damage": 18,
       "gain": {
         "dealt": 3.5,
