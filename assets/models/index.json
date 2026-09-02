@@ -45,6 +45,10 @@
       },
       "jump": {
         "clip": "jump"
+      },
+      "block": {
+        "clip": "block",
+        "loop": false
       }
     },
     "timings": {

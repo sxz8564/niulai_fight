@@ -12,7 +12,10 @@ const KEYS = {
   ArrowUp: 'up', KeyW: 'up',
   ArrowDown: 'down', KeyS: 'down',
   KeyJ: 'punch', Space: 'punch',
-  KeyK: 'kick', KeyL: 'kick'
+  KeyK: 'kick',
+  // Block is held rather than tapped, so it gets keys that are comfortable to
+  // hold down while still steering with the other hand.
+  KeyL: 'block', ShiftLeft: 'block', ShiftRight: 'block'
 };
 
 export function createInput(target = window) {
@@ -47,6 +50,8 @@ export function createInput(target = window) {
         z: (held.has('down') ? 1 : 0) - (held.has('up') ? 1 : 0)
       };
     },
+    /** True while the key is down — for actions that are held, not tapped. */
+    holding(action) { return held.has(action); },
     consume(action) {
       if (!pressed.has(action)) return false;
       pressed.delete(action);

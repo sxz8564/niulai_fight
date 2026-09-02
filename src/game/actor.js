@@ -16,7 +16,7 @@ import * as THREE from 'three';
  */
 
 /** The states the game asks for. A rigged model needs a clip for each. */
-export const STATES = ['idle', 'walk', 'punch', 'kick', 'hit', 'down'];
+export const STATES = ['idle', 'walk', 'punch', 'kick', 'hit', 'down', 'block'];
 
 const UNIT = 1.0;            // one world unit is roughly one character height
 const HEAD_HEIGHT = 0.42;    // how much of that height the head takes up

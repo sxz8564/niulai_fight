@@ -40,7 +40,14 @@ export class Fighter {
     this.downTimer = 0;
     this.invulnerable = 0;
     this.dead = false;
+    this.blocking = false;
   }
+
+  /* What a block is worth. Not immunity: chip damage keeps a turtling player
+   * from simply holding the button and waiting the wave out, and the reduced
+   * knockback is what makes blocking feel like standing your ground. */
+  static BLOCK_DAMAGE = 0.2;
+  static BLOCK_KNOCKBACK = 0.35;
 
   get position() { return this.root.position; }
   get busy() { return this.attackTimer > 0 || this.stunTimer > 0 || this.downTimer > 0; }
@@ -71,6 +78,25 @@ export class Fighter {
 
   takeHit(damage, fromDirection) {
     if (this.dead || this.invulnerable > 0 || this.downTimer > 0) return false;
+
+    /*
+     * A block only works against what you are facing. `fromDirection` is the
+     * direction the blow travels, so a hit that lands while you face into it
+     * is one you are looking at; a hit travelling the same way you face came
+     * from behind you, and a raised guard is no use there. That asymmetry is
+     * the point — blocking should be a decision about where you are looking,
+     * not a button that switches damage off.
+     */
+    const guarded = this.blocking && fromDirection === -this.facing;
+    if (guarded) {
+      this.health -= damage * Fighter.BLOCK_DAMAGE;
+      this.invulnerable = 0.18;
+      this.velocity.x = fromDirection * 3.4 * Fighter.BLOCK_KNOCKBACK;
+      if (this.health > 0) return true;   // a blocked hit never knocks down
+      this.health = 1;
+      return true;
+    }
+
     this.health -= damage;
     this.invulnerable = 0.18;
     this.velocity.x = fromDirection * 3.4;
@@ -128,7 +154,7 @@ export class Fighter {
     clampToBelt(this.position);
 
     this.actor.setFacing(this.facing);
-    this.actor.play(moving ? 'walk' : 'idle');
+    this.actor.play(this.blocking ? 'block' : (moving ? 'walk' : 'idle'));
     this.actor.update(dt, Math.min(1, this.velocity.length() / this.speed));
   }
 }

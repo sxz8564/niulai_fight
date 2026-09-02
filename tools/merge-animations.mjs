@@ -48,6 +48,7 @@ const NAMING = [
   { match: /Regular_Jump|^.*Jump/i, name: 'jump' },
   { match: /Running|Run(?!g)/i, name: 'run' },
   { match: /Walking|Walk/i, name: 'walk' },
+  { match: /Block/i, name: 'block' },
   { match: /Idle|Guard_Idle/i, name: 'idle' }
 ];
 

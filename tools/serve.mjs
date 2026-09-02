@@ -39,6 +39,14 @@ export function serve(port = 0) {
       response.end('not found');
     }
   });
+  // The game asks for every model at once on startup. A dev server that drops
+  // one of those under the burst looks exactly like a broken asset.
+  server.keepAliveTimeout = 10000;
+  server.headersTimeout = 20000;
+  server.on('clientError', (error, socket) => {
+    if (socket.writable) socket.end('HTTP/1.1 400 Bad Request\r\n\r\n');
+  });
+
   return new Promise((resolve) => {
     server.listen(port, '127.0.0.1', () => resolve({
       server,

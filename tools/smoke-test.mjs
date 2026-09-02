@@ -224,6 +224,65 @@ const depth = await api(() => {
 check('a punch lands when level on the belt', depth.levelHit);
 check('and misses someone standing further up it', !depth.apartHit);
 
+/* Blocking. The point of it is the asymmetry: it works against what you are
+ * facing and not against what you are not, so both halves are checked. */
+const blocked = await api(() => {
+  const g = globalThis.__niulaiFight.game;
+  const api2 = globalThis.__niulaiFight;
+
+  function hit({ blocking, facing }) {
+    g.player.health = g.player.maxHealth;
+    g.player.dead = false;
+    g.player.downTimer = 0; g.player.stunTimer = 0; g.player.invulnerable = 0;
+    g.player.blocking = blocking;
+    g.player.facing = facing;
+    // A blow arriving from the player's right travels leftward, so its
+    // direction is -1.
+    g.player.takeHit(20, -1);
+    return g.player.maxHealth - g.player.health;
+  }
+
+  const facingInto = hit({ blocking: true, facing: 1 });
+  const facingAway = hit({ blocking: true, facing: -1 });
+  const unguarded = hit({ blocking: false, facing: 1 });
+
+  // And a blocked hit must never knock you down, however little health is left.
+  g.player.health = 2;
+  g.player.blocking = true;
+  g.player.facing = 1;
+  g.player.invulnerable = 0;
+  g.player.takeHit(999, -1);
+  const survivedChip = !g.player.dead && g.player.downTimer === 0;
+
+  return { facingInto, facingAway, unguarded, survivedChip };
+});
+check('blocking cuts damage from a blow you are facing',
+  blocked.facingInto < blocked.unguarded, `${blocked.facingInto} vs ${blocked.unguarded} unguarded`);
+check('blocking does nothing against a blow from behind',
+  blocked.facingAway === blocked.unguarded, `${blocked.facingAway} vs ${blocked.unguarded}`);
+check('a blocked hit never knocks you down', blocked.survivedChip);
+
+/* Holding block has to cost something, or it is a button with no decision. */
+const cost = await api(() => {
+  const g = globalThis.__niulaiFight.game;
+  g.player.blocking = false;
+  g.player.health = g.player.maxHealth;
+  g.player.dead = false; g.player.downTimer = 0; g.player.stunTimer = 0;
+  const startX = g.player.position.x;
+
+  globalThis.__niulaiFight.press('block');
+  globalThis.__niulaiFight.press('right');
+  globalThis.__niulaiFight.step(1.0);
+  const movedWhileBlocking = Math.abs(g.player.position.x - startX);
+  const attackedWhileBlocking = g.player.attackTimer > 0;
+  globalThis.__niulaiFight.release('block');
+  globalThis.__niulaiFight.release('right');
+  return { movedWhileBlocking, attackedWhileBlocking, blocking: g.player.blocking };
+});
+check('you cannot walk while blocking', cost.movedWhileBlocking < 0.05,
+  `moved ${cost.movedWhileBlocking.toFixed(3)}`);
+check('you cannot swing while blocking', !cost.attackedWhileBlocking);
+
 check('still no script errors after playing', errors.length === 0, errors[0] || '');
 
 writeFileSync(join(shots, 'result.json'), JSON.stringify({ passed, failed }, null, 2));

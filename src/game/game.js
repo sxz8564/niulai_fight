@@ -59,11 +59,25 @@ export class Game {
 
   async load() {
     const loader = new GLTFLoader();
-    const registry = await fetch(`${this.assetBase}models/index.json`).then((r) => r.json());
+
+    /*
+     * One retry per asset. Everything here is local — bundled in the
+     * extension, or served off disk — so a failure is a transient rather than
+     * a missing file, and the cost of not retrying is a game that starts with
+     * an invisible character. Failing on the second attempt still throws,
+     * because a file that is genuinely absent should be loud.
+     */
+    const twice = async (attempt) => {
+      try { return await attempt(); }
+      catch { return await attempt(); }
+    };
+
+    const registry = await twice(() =>
+      fetch(`${this.assetBase}models/index.json`).then((r) => r.json()));
     this.specs = Object.fromEntries(registry.map((s) => [s.id, s]));
 
-    const gltfs = await Promise.all(registry.map((spec) =>
-      loader.loadAsync(`${this.assetBase}models/${spec.file}`).then((g) => [spec.id, g])));
+    const gltfs = await Promise.all(registry.map(async (spec) =>
+      [spec.id, await twice(() => loader.loadAsync(`${this.assetBase}models/${spec.file}`))]));
     this.gltfs = Object.fromEntries(gltfs);
 
     const backdrop = await new THREE.TextureLoader()
@@ -154,7 +168,19 @@ export class Game {
       if (p.downTimer <= 0) this.loseLife();
       return;
     }
-    if (!p.canAct) return;
+    if (!p.canAct) { p.blocking = false; return; }
+
+    /*
+     * Blocking is held, and it costs you everything else: no moving, no
+     * swinging. Without that price a player would simply hold it all the time,
+     * and a defence with no downside is not a decision.
+     */
+    p.blocking = this.input.holding('block');
+    if (p.blocking) {
+      this.buffered = null;
+      p.velocity.set(0, 0, 0);
+      return;
+    }
 
     if (this.buffered) {
       const kind = this.buffered.kind;
