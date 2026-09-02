@@ -1,0 +1,27 @@
+{
+  "punch": {
+    "file": "punch.webm",
+    "volume": 0.5,
+    "voices": 3
+  },
+  "kick": {
+    "file": "kick.webm",
+    "volume": 0.5,
+    "voices": 3
+  },
+  "fall": {
+    "file": "fall.webm",
+    "volume": 0.45,
+    "voices": 3
+  },
+  "select": {
+    "file": "select.webm",
+    "volume": 0.35,
+    "voices": 2
+  },
+  "confirm": {
+    "file": "confirm.webm",
+    "volume": 0.5,
+    "voices": 1
+  }
+}

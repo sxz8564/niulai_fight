@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { soundBank } from './game/sound.js';
 
 /*
  * The character select.
@@ -11,6 +12,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
  */
 
 export async function chooseCharacter(assetBase, root) {
+  const sounds = soundBank(assetBase);
   const registry = await fetch(`${assetBase}models/index.json`).then((r) => r.json());
   const heroes = registry.filter((spec) => spec.playable);
 
@@ -63,6 +65,13 @@ export async function chooseCharacter(assetBase, root) {
       button.appendChild(key);
 
       button.addEventListener('click', () => pick(spec.id));
+      /*
+       * A tick as the cursor crosses a card. Pointer movement is not a user
+       * gesture as far as autoplay policy is concerned, so the very first one
+       * may be swallowed — which is fine, and why nothing here checks.
+       */
+      button.addEventListener('pointerenter', () => sounds.play('select'));
+      button.addEventListener('focus', () => sounds.play('select'));
       root.appendChild(button);
 
       cards.push(portrait(canvas, loader, assetBase, spec));

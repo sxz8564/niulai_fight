@@ -629,6 +629,7 @@ await api(() => {
 });
 
 
+
 /* ------------------------------------------------------------------- rage --
  *
  * Niulai's super. The meter is a promise: being surrounded, which the ordinary
@@ -1181,6 +1182,106 @@ check('a fighter with no celebration falls back to its idle rather than freezing
   second.won && !second.hasWin && second.endState === 'idle' && second.stillMoving > 0,
   `${second.endState}, ${second.stillMoving} bones moving`);
 
+
+/* ------------------------------------------------------------------ sound --
+ *
+ * Impacts, and who gets to make them. The player's punches and kicks are the
+ * only ones that thud: the wolves throwing the same sound back would turn a
+ * crowd into noise, and the point of these is that a player can hear their own
+ * hits land without watching the health bars.
+ */
+const sfx = await api(async () => {
+  const g = globalThis.__niulaiFight.game;
+  await g.sounds.load();
+  const decoded = {};
+  for (const name of g.sounds.names) {
+    const audio = g.sounds.bank.get(name).voices[0];
+    await new Promise((resolve) => {
+      if (audio.readyState >= 1) return resolve();
+      audio.addEventListener('loadedmetadata', resolve, { once: true });
+      audio.addEventListener('error', resolve, { once: true });
+      setTimeout(resolve, 5000);
+    });
+    decoded[name] = { seconds: audio.duration, error: audio.error ? audio.error.code : null };
+  }
+  return { names: g.sounds.names, decoded };
+});
+const undecodable = Object.entries(sfx.decoded)
+  .filter(([, v]) => v.error !== null || !(v.seconds > 0))
+  .map(([k]) => k);
+check('every sound in the bank is one the browser can decode',
+  sfx.names.length >= 5 && undecodable.length === 0,
+  undecodable.length ? `cannot decode: ${undecodable.join(', ')}` : sfx.names.join(', '));
+
+/*
+ * Which event makes which noise. Recorded by standing in for `play` rather than
+ * by listening, because what is being checked is the wiring — whether a sound
+ * comes out of the speakers is the browser's business and a muted test machine
+ * would answer no to all of it.
+ */
+const heard = await api(() => {
+  const g = globalThis.__niulaiFight.game;
+  const api2 = globalThis.__niulaiFight;
+  const log = [];
+  const real = g.sounds.play.bind(g.sounds);
+  g.sounds.play = (name) => { log.push(name); return true; };
+
+  globalThis.__wolves(1);
+  const wolf = g.enemies[0];
+  const reset = () => {
+    const p = g.player;
+    p.health = p.maxHealth; p.dead = false; p.downTimer = 0; p.stunTimer = 0;
+    p.attackTimer = 0; p.invulnerable = 0; p.blocking = false; p.facing = 1;
+    g.buffered = null;
+    wolf.health = 999; wolf.maxHealth = 999; wolf.dead = false;
+    wolf.downTimer = 0; wolf.stunTimer = 0; wolf.invulnerable = 0; wolf.thinkTimer = 999;
+    wolf.root.position.set(p.position.x + 0.6, 0, p.position.z);
+    log.length = 0;
+  };
+  const take = () => { const copy = log.slice(); log.length = 0; return copy; };
+
+  reset();
+  api2.press('punch');
+  api2.step(g.player.timings.punch + 0.2);
+  const punching = take();
+
+  reset();
+  api2.press('kick');
+  api2.step(g.player.timings.kick + 0.2);
+  const kicking = take();
+
+  // A wolf landing one on the player must make neither.
+  reset();
+  wolf.facing = -1;
+  for (let i = 0; i < 30 && g.player.health === g.player.maxHealth; i++) {
+    wolf.thinkTimer = 0;
+    g.player.invulnerable = 0;
+    api2.step(0.25);
+  }
+  const hurtBefore = g.player.health < g.player.maxHealth;
+  const beingHit = take();
+
+  // And a body going down, whoever it belongs to.
+  reset();
+  wolf.health = 5;
+  api2.press('punch');
+  api2.step(g.player.timings.punch + 0.4);
+  const knockdown = take();
+
+  g.sounds.play = real;
+  for (const enemy of g.enemies) g.scene.remove(enemy.root);
+  g.enemies = [];
+  return { punching, kicking, beingHit, hurtBefore, knockdown };
+});
+check('the player\'s punch landing makes a punch',
+  heard.punching.join() === 'punch', heard.punching.join(', ') || 'silence');
+check('and their kick makes a kick',
+  heard.kicking.join() === 'kick', heard.kicking.join(', ') || 'silence');
+check('a wolf hitting the player makes neither',
+  heard.hurtBefore && heard.beingHit.length === 0,
+  heard.beingHit.join(', ') || 'silence, and the player was hit');
+check('a body going down thuds', heard.knockdown.includes('fall'),
+  heard.knockdown.join(', ') || 'silence');
 
 /* ------------------------------------------------------------ the ending --
  *

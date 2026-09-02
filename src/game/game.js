@@ -4,6 +4,7 @@ import { createActor } from './actor.js';
 import { Fighter, separate } from './fighter.js';
 import { Boss } from './boss.js';
 import { Power } from './power.js';
+import { soundBank } from './sound.js';
 import { buildStage, clampToBelt, BELT_NEAR, BELT_FAR, STAGE_END } from './stage.js';
 import { createInput } from './input.js';
 
@@ -76,6 +77,7 @@ export class Game {
 
   async load() {
     const loader = new GLTFLoader();
+    this.sounds = soundBank(this.assetBase);
 
     /*
      * One retry per asset. Everything here is local — bundled in the
@@ -141,7 +143,8 @@ export class Game {
     actor.root.position.set(at.x, 0, at.z);
     this.scene.add(actor.root);
     const fighter = new Fighter(actor, {
-      ...(spec.body || {}), ...stats, facing: stats.facing ?? 1, timings: spec.timings
+      ...(spec.body || {}), ...stats, facing: stats.facing ?? 1, timings: spec.timings,
+      onDown: () => this.sounds.play('fall')
     });
     actor.setFacing(fighter.facing);
     return fighter;
@@ -315,8 +318,17 @@ export class Game {
       for (const enemy of this.enemies) {
         if (enemy.dead) continue;
         if (this.player.inRange(enemy)) {
-          enemy.takeHit(this.player.damage, this.player.facing);
+          const landed = enemy.takeHit(this.player.damage, this.player.facing);
           this.player.hasLanded = true;
+          /*
+           * On contact, not on the swing, and only for the player, and only
+           * when the hit actually registered. A heavy impact under a punch that
+           * missed is a lie, one under a punch the target's invulnerability ate
+           * is a smaller lie, and the wolves throwing the same sound back would
+           * turn a crowd into noise — the point of these is that the player can
+           * hear their own hits land.
+           */
+          if (landed) this.sounds.play(this.player.attackKind === 'kick' ? 'kick' : 'punch');
           this.score += 100;
           if (this.power) this.power.gain('dealt');
           break;    // one target per swing, like the originals

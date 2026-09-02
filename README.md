@@ -47,6 +47,47 @@ Stepping up and down is not decoration. An attack only lands if you are close
 in X *and* nearly level in Z, so a wolf standing a metre upstage cannot hit you
 and you cannot hit it. Circling is how you fight three at once.
 
+## Sound
+
+Five short files, played through `<audio>` elements. No mixer, no graph, no
+library — for a handful of impacts that is the whole job.
+
+| | |
+| --- | --- |
+| **punch**, **kick** | the player's, on contact |
+| **fall** | anything knocked down, hero, wolf or Cart |
+| **select**, **confirm** | moving across the roster, and choosing |
+
+**Punches and kicks are the player's only.** The wolves throwing the same sound
+back would turn a crowd into noise, and the point of these is that a player can
+hear their own hits land without watching the health bars. They fire on contact
+rather than on the swing, and only when the hit actually registered — a heavy
+impact under a punch that missed is a lie, and one under a punch the target's
+invulnerability ate is a smaller one.
+
+The knockdown is a hook on the Fighter rather than four call sites in the game.
+Punches, a charge and a stampede all arrive through `takeHit` and all end the
+same way, so the sound belongs where they meet.
+
+Each sound gets a few `<audio>` elements played round robin. One element per
+sound cuts itself off, so two punches a tenth of a second apart become one
+punch — which is exactly the moment a brawler most needs to sound like two.
+
+Silence is never treated as failure. Autoplay policy blocks anything before the
+first real interaction, a muted tab rejects `play()` outright, and every path
+swallows its own errors so none of it can reach the game loop. What *is* checked
+is that every file in the bank is one the browser can decode, and that the right
+event makes the right noise — recorded by standing in for `play` rather than by
+listening, since a muted test machine would answer no to everything.
+
+Everything is Opus in WebM, including the sources that arrived as Ogg Vorbis and
+24-bit WAV: one format the whole toolchain and both test suites already know how
+to check, and 404 KB of audio becomes 40.
+
+```bash
+ffmpeg -i in.wav -vn -c:a libopus -b:a 64k -ar 48000 assets/audio/out.webm
+```
+
 ## Rage
 
 **Both fighters have a meter**, both fill it the same way, and both spend it on
@@ -374,6 +415,7 @@ src/
     ├── fighter.js     health, hitstun, knockdown — shared by player and wolves
     ├── boss.js        the Cart: stalk, wind up, charge, stall
     ├── power.js       the rage meter and what it summons
+    ├── sound.js       the sound bank, and enough voices to overlap
     ├── actor.js       rigged models, props, and the placeholder body
     ├── stage.js       ground, trees, the painted backdrop
     └── input.js       keyboard and touch

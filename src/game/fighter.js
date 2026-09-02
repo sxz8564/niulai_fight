@@ -46,6 +46,11 @@ export class Fighter {
     this.armored = options.armored ?? false;     // whether a hit interrupts it
     this.vulnerability = 1;                      // damage multiplier, set per phase
     this.pose = null;                            // overrides idle/walk when set
+    // Called when this fighter is knocked down, whoever put it there. The
+    // knockdown is the one moment worth a sound for everybody, so it is a hook
+    // here rather than four call sites in the game — punches, a charge and a
+    // stampede all arrive through takeHit and all end the same way.
+    this.onDown = options.onDown || null;
 
     this.velocity = new THREE.Vector3();
     this.attackTimer = 0;      // >0 while an attack is playing
@@ -129,6 +134,7 @@ export class Fighter {
       this.downTimer = this.timings.down;
       this.actor.play('down');
       this.velocity.x = fromDirection * 5.0 * this.knockback;
+      if (this.onDown) this.onDown(this);
       return true;
     }
 

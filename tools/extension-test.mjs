@@ -60,6 +60,10 @@ for (const spec of registry) {
   if (spec.file) referenced.push(`assets/models/${spec.file}`);
   if (spec.power && spec.power.shout) referenced.push(`assets/${spec.power.shout}`);
 }
+const bank = JSON.parse(readFileSync(join(root, 'assets/audio/index.json'), 'utf8'));
+for (const entry of Object.values(bank)) {
+  referenced.push(`assets/audio/${typeof entry === 'string' ? entry : entry.file}`);
+}
 
 const absent = referenced.filter((file) => !existsSync(join(root, file)));
 check('every file the extension references exists', absent.length === 0,

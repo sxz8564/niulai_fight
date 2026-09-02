@@ -1,5 +1,6 @@
 import { Game } from './game/game.js';
 import { chooseCharacter } from './select.js';
+import { soundBank } from './game/sound.js';
 
 /*
  * Bootstrap: choose a fighter, play a round, offer another.
@@ -120,7 +121,16 @@ function pickFighter() {
 
   return new Promise((resolve) => {
     let done = false;
-    const settle = (id) => { if (!done) { done = true; offerChoice = null; resolve(id); } };
+    // The confirmation lives here rather than in the roster, because a fighter
+    // can also be chosen by keyboard or by the test harness and all three
+    // routes come through this one function.
+    const settle = (id) => {
+      if (done) return;
+      done = true;
+      offerChoice = null;
+      soundBank('assets/').play('confirm');
+      resolve(id);
+    };
     offerChoice = settle;
     chooseCharacter('assets/', roster).then(settle);
   });
