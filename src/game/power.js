@@ -80,6 +80,9 @@ export class Power {
       try {
         this.shout = new Audio(`${host.assetBase}${spec.shout}`);
         this.shout.preload = 'auto';
+        // Louder than the impacts by default, because a super should be — but
+        // a character whose noise needs pulling back can say so.
+        this.shout.volume = spec.shoutVolume ?? 1;
       } catch { this.shout = null; }
     }
   }

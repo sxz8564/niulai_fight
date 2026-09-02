@@ -1,6 +1,6 @@
 {
   "name": "niulai-fight",
-  "version": "0.7.2",
+  "version": "0.7.3",
   "private": true,
   "description": "A belt-scrolling brawler: Niulai against the wolves, left to right.",
   "type": "module",

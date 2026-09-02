@@ -61,6 +61,11 @@ library — for a handful of impacts that is the whole job.
 | **select**, **confirm** | moving across the roster, and choosing |
 | **theme** | a two-and-a-quarter-minute loop, under everything |
 
+The two supers have a sound each, hung off the character rather than the bank:
+Niulai's call to his mother, and the noise Baola's change makes. Both are
+`shout` in the registry's `power` block, played the moment the meter is spent,
+and `shoutVolume` pulls one back if it sits too loud against the rest.
+
 **Punches and kicks are the player's only.** The wolves throwing the same sound
 back would turn a crowd into noise, and the point of these is that a player can
 hear their own hits land without watching the health bars. They fire on contact

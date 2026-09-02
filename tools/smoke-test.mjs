@@ -994,10 +994,44 @@ const second = await page.evaluate(async () => {
   const ordinaryForm = baola.player.actor.root.name;
   const ordinaryRoot = baola.player.root;
 
+  /*
+   * The noise the change makes. Spied on the element rather than listened to:
+   * whether a sound reaches the speakers is the browser's business, and a muted
+   * test machine would answer no to all of it. What is checkable is that the
+   * file decodes and that the cast is what reaches for it.
+   */
+  const shout = baola.power.shout;
+  let shouts = 0;
+  const shoutInfo = { file: null, seconds: 0, error: 'no shout' };
+  if (shout) {
+    await new Promise((resolve) => {
+      if (shout.readyState >= 1) return resolve();
+      shout.addEventListener('loadedmetadata', resolve, { once: true });
+      shout.addEventListener('error', resolve, { once: true });
+      setTimeout(resolve, 5000);
+    });
+    shoutInfo.file = shout.src.split('/').slice(-2).join('/');
+    shoutInfo.seconds = shout.duration;
+    shoutInfo.error = shout.error ? shout.error.code : null;
+    shoutInfo.volume = shout.volume;
+    shout.play = () => { shouts++; return Promise.resolve(); };
+  }
+
   readyUp();
   baola.power.meter = baola.power.max;
   baola.input.press('power');
   baola.update(1 / 60);
+  const shouted = shouts;
+
+  // And a press with nothing in the meter must be silent, not just ineffective.
+  shouts = 0;
+  const bankedMeter = baola.power.meter;
+  baola.power.meter = 0;
+  baola.input.press('power');
+  baola.update(1 / 60);
+  const shoutedOnEmpty = shouts;
+  baola.power.meter = bankedMeter;
+
   const changed = {
     form: baola.player.actor.root.name,
     named: baola.snapshot().playerName,
@@ -1116,6 +1150,7 @@ const second = await page.evaluate(async () => {
     ordinaryPunch, superPunch, afterPunch,
     ordinaryHurt, superHurt, afterHurt,
     ordinaryForm, changed, walkedWhileSuper, reverted, cleared, growth, cameDown,
+    shoutInfo, shouted, shoutedOnEmpty,
     bones: bones.length,
     breathing,
     hasWin: baola.player.actor.has('win'),
@@ -1136,6 +1171,13 @@ check('the two heroes are not identical', second.speed !== 4.1 || second.health 
  */
 check('Baola has a meter too, and it buys a different move',
   second.kind === 'transform' && second.rage !== null, `kind: ${second.kind}`);
+check('her change has a sound, and it is one the browser can decode',
+  second.shoutInfo.error === null && second.shoutInfo.seconds > 0,
+  `${second.shoutInfo.file} — ${second.shoutInfo.seconds
+    ? second.shoutInfo.seconds.toFixed(2) + 's at ' + second.shoutInfo.volume : 'no audio'}`);
+check('it goes off when she changes, and not on a press that cannot pay for it',
+  second.shouted === 1 && second.shoutedOnEmpty === 0,
+  `${second.shouted} on the cast, ${second.shoutedOnEmpty} on an empty meter`);
 check('casting it turns her into something else',
   second.changed.form === 'superbaola' && second.changed.named === 'Super Baola',
   `${second.ordinaryForm} -> ${second.changed.form}`);
