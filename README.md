@@ -30,7 +30,7 @@ Pick a fighter first. **Niulai** is steady — more health, hits harder.
 | **J** or **Space** | punch |
 | **K** | kick |
 | **L** or **Shift** (hold) | block |
-| **M** or **U** | MAMA — Niulai only, when the rage bar is full |
+| **M** or **U** | the super, when the rage bar is full — MAMA for Niulai, SUPER for Baola |
 | **R** (when it ends) | play again |
 | **C** (when it ends) | choose a different fighter |
 
@@ -47,7 +47,13 @@ Stepping up and down is not decoration. An attack only lands if you are close
 in X *and* nearly level in Z, so a wolf standing a metre upstage cannot hit you
 and you cannot hit it. Circling is how you fight three at once.
 
-## Rage, and mama
+## Rage
+
+**Both fighters have a meter**, both fill it the same way, and both spend it on
+**M** — but what it buys is not the same move with different numbers, because
+they do not have the same problem.
+
+### Niulai: mama
 
 Niulai has a meter. It fills from **both** halves of a fight — three and a half
 for landing a hit, six for taking one, five for finishing a wolf — and when it
@@ -86,10 +92,29 @@ spends standing still is what it costs — and he is untouchable for that second
 because a super that a stray wolf can cancel is a super nobody uses when they
 are surrounded, which is the only time it is worth using.
 
-**Baola has no meter and no key.** Her super is not designed yet, and a bar that
-fills and does nothing is a worse promise than no bar. It is a registry entry:
-give a character a `power` block and the bar, the key and the pad button all
-appear.
+### Baola: seven seconds as something else
+
+Hers does not touch the screen at all. She **becomes** something else —
+Super Baola 超级豹拉, a jaguar warrior a third again her size — for seven
+seconds: **double damage out, half damage in**, and no pause at all.
+
+![Super Baola standing over a line of wolves](docs/super.png)
+
+That last part is the design. Niulai's costs a second of standing still because
+it answers being surrounded, and a screen-clear is worth paying for. Hers
+answers the opposite problem — a fight she is losing on attrition, where what
+she needs is not the screen cleared but a window in which trading hits is
+finally in her favour. Locking her in place for it would spend the thing it
+gives her.
+
+The swap is of the actor, not the fighter: health, position, facing, the meter
+and every rule about hitstun stay where they were, and only the body doing it
+changes. The bar becomes a clock while it runs, in a different colour, so a
+half-full bar never means two things.
+
+Which of the two a character gets is `kind` in the registry — `summon` or
+`transform`. A character with no `power` block still gets no meter, no key and
+no bar.
 
 ## Winning
 
@@ -165,7 +190,7 @@ npm run serve      # then open the printed address
 
 ## The characters
 
-**The three fighters are rigged bipeds.** `npm run models` reads one folder
+**The four fighting bodies are rigged bipeds.** `npm run models` reads one folder
 per character under `incoming/` and writes a single `.glb` each — 11 clips for
 Niulai and Baola, 10 for Wolfwolf, around a megabyte apiece.
 
@@ -202,6 +227,11 @@ true`, its clip trims and its stats, and it appears on the select screen with a
 portrait rendered from the model itself. Baola went in that way, and reuses
 Niulai's trims unchanged — the clips came from the same generator with the same
 names, so the slices that worked for him work for her.
+
+Super Baola is a registry entry too, and reuses Baola's clip trims unchanged:
+same rig, same clip names, same rest height, a different mesh and a bigger
+scale. Five clips rather than eight — no block, no knee, no jump — and
+`fallbacks` covers the gap.
 
 A boss is a registry entry and a gate: `{ x, count, boss: 'cart' }` on the last
 gate is what puts it there. Its size lives in the registry too, and it matters
@@ -240,13 +270,18 @@ holds you until the wave is dead, that a punch damages a wolf, that enough
 punches finish one, that a wolf can hurt you, that clearing opens the gate, and
 that a punch misses someone standing further up the belt.
 
-The super gets its own set too: that the meter fills from hitting and from being
-hit, that it will not fire early, that firing it empties the meter and plants
+Each super gets its own set. Niulai's: that the meter fills from hitting and
+from being hit, that it will not fire early, that firing it empties the meter and plants
 him in the summon pose, that ten of them arrive in parallel lines and all run
 the same way, that nothing can touch him mid-summon, that a screen of wolves
 does not survive it, that several of them land on the Cart at once because it is
 wide enough for that, that the herd clears itself off the field, that the shout
-is in a format the browser can decode — and that Baola has none of it.
+is in a format the browser can decode. Baola's: that casting it turns her into
+something else, that the new body takes over the old one's place in the scene
+rather than a place beside it, that it runs for seven seconds and never holds
+her still, that she hits for exactly twice and takes exactly half, that seven
+seconds later she is entirely herself again, and that a round ending in the
+middle of it puts her back.
 
 The ending has checks of its own: that clearing the last gate plays the
 celebration rather than stopping the frame, that the bones are still moving

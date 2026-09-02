@@ -11,7 +11,7 @@ import { serve } from './serve.mjs';
  *
  *   icon-128.png         store icon,         128 x 128
  *   icons/icon*.png      the manifest icons, 16 / 32 / 48 / 128
- *   1-select.png ...     screenshots,        1280 x 800
+ *   1-select.png ...     screenshots,        1280 x 800 (six; five go up)
  *   promo-440x280.png    small promo tile
  *   promo-1400x560.png   marquee promo tile
  *
@@ -192,6 +192,50 @@ await page.evaluate(() => {
 });
 await page.screenshot({ path: join(out, '5-win.png'), animations: 'disabled' });
 console.log('5-win.png');
+
+/*
+ * And the other fighter's super, which needs the other fighter — so this goes
+ * back to the roster and picks her, through the same round loop a player uses.
+ * Nothing else here exercises that path, so a broken restart would show up as a
+ * missing screenshot rather than as a bug someone finds later.
+ */
+await page.evaluate(() => globalThis.__niulaiFight.finish('select'));
+await page.waitForFunction(() => !globalThis.__niulaiFight.game, null, { timeout: 60000 });
+await page.evaluate(() => globalThis.__niulaiFight.choose('baola'));
+await page.waitForFunction(() => globalThis.__niulaiFight.game, null, { timeout: 60000 });
+await page.evaluate(() => globalThis.__niulaiFight.stop());
+
+await page.evaluate(() => {
+  const api = globalThis.__niulaiFight;
+  const g = api.game;
+  api.press('right');
+  api.step(6);
+  api.release('right');
+  g.spawnQueue = 3;
+  g.spawnTimer = 0;
+  api.step(3);
+  g.enemies.forEach((wolf, i) => {
+    wolf.root.position.set(g.player.position.x + 1.5 + i * 0.85, 0, -1.0 + i * 0.7);
+    wolf.stunTimer = 0; wolf.attackTimer = 0; wolf.thinkTimer = 99;
+  });
+
+  // Stand her up before pressing: the super is not buffered, and a press while
+  // she cannot act is dropped.
+  g.player.health = g.player.maxHealth;
+  g.player.dead = false;
+  g.player.downTimer = 0; g.player.stunTimer = 0; g.player.attackTimer = 0;
+  g.player.invulnerable = 0; g.player.blocking = false;
+  g.buffered = null;
+  g.player.facing = 1;
+  g.power.meter = g.power.max;
+  api.press('power');
+  api.step(0.1);
+  if (g.power.remaining <= 0) throw new Error('she did not transform — nothing to photograph');
+  api.step(0.9);
+  g.onState(g.snapshot());
+});
+await page.screenshot({ path: join(out, '6-super.png'), animations: 'disabled' });
+console.log('6-super.png');
 await page.close();
 
 /* ------------------------------------------------------- tiles and icons */

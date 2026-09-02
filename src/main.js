@@ -55,9 +55,14 @@ function paint(state) {
   hud.rageWrap.hidden = !rage;
   hud.padPower.hidden = !rage;
   if (rage) {
-    hud.rageLabel.textContent = rage.ready ? `${rage.name} READY` : rage.name;
+    hud.rageLabel.textContent = rage.active
+      ? `${rage.name} ${Math.ceil(rage.seconds)}s`
+      : (rage.ready ? `${rage.name} READY` : rage.name);
     hud.rage.style.width = `${rage.fraction * 100}%`;
     hud.rageWrap.classList.toggle('ready', rage.ready);
+    // A running transformation drains the same bar, so it needs its own colour
+    // or a half-full bar means two different things.
+    hud.rageWrap.classList.toggle('super', Boolean(rage.active));
     hud.padPower.textContent = rage.name.slice(0, 1);
   }
   hud.hint.textContent = '← → move · ↑ ↓ step up and down · J punch · K kick · ' +

@@ -943,6 +943,113 @@ const second = await page.evaluate(async () => {
   for (let i = 0; i < 24; i++) baola.update(1 / 60);
   const breathing = moved(atRest, sample());
 
+
+  /* ---------------------------------------------- her super: seven seconds --
+   *
+   * Niulai's clears the screen. Hers does not touch the screen at all: she
+   * becomes something else for seven seconds, hits twice as hard and takes half
+   * as much, and — the part that makes it a different move rather than the same
+   * one with different numbers — she is never held in place for it. The seven
+   * seconds are hers to fight in.
+   */
+  const readyUp = () => {
+    baola.player.health = baola.player.maxHealth;
+    baola.player.dead = false;
+    baola.player.downTimer = 0; baola.player.stunTimer = 0; baola.player.attackTimer = 0;
+    baola.player.invulnerable = 0; baola.player.blocking = false;
+    baola.buffered = null;
+    baola.player.facing = 1;
+  };
+  /* One punch through the real input path, and what it took off. The wolf is
+   * given more health than the fight can spend so a doubled hit still leaves a
+   * number to read. */
+  const punchOnce = () => {
+    const wolf = baola.enemies[0];
+    wolf.health = 999; wolf.maxHealth = 999;
+    wolf.stunTimer = 0; wolf.downTimer = 0; wolf.invulnerable = 0; wolf.dead = false;
+    wolf.root.position.set(baola.player.position.x + 0.6, 0, baola.player.position.z);
+    readyUp();
+    baola.input.press('punch');
+    for (let i = 0; i < 40; i++) baola.update(1 / 60);
+    return 999 - wolf.health;
+  };
+  /* And what one costs her. */
+  const takeOne = () => {
+    baola.player.health = baola.player.maxHealth;
+    baola.player.dead = false; baola.player.downTimer = 0; baola.player.stunTimer = 0;
+    baola.player.invulnerable = 0; baola.player.blocking = false;
+    baola.player.takeHit(20, -1);
+    return baola.player.maxHealth - baola.player.health;
+  };
+
+  const sparring = baola.spawnFighter('wolfwolf',
+    { x: baola.player.position.x + 0.6, z: baola.player.position.z },
+    { health: 999, speed: 2.5, damage: 8, team: 'enemy', facing: -1 });
+  sparring.thinkTimer = 999;     // it is here to be hit, not to fight back
+  baola.enemies.push(sparring);
+
+  const ordinaryPunch = punchOnce();
+  const ordinaryHurt = takeOne();
+  const ordinaryForm = baola.player.actor.root.name;
+  const ordinaryRoot = baola.player.root;
+
+  readyUp();
+  baola.power.meter = baola.power.max;
+  baola.input.press('power');
+  baola.update(1 / 60);
+  const changed = {
+    form: baola.player.actor.root.name,
+    named: baola.snapshot().playerName,
+    remaining: baola.power.remaining,
+    locked: baola.power.casting,
+    inScene: baola.scene.children.includes(baola.player.root),
+    oldGone: !baola.scene.children.includes(ordinaryRoot)
+  };
+
+  // Not held in place, unlike the summon.
+  const wasX = baola.player.position.x;
+  baola.input.press('right');
+  for (let i = 0; i < 20; i++) baola.update(1 / 60);
+  baola.input.release('right');
+  const walkedWhileSuper = baola.player.position.x - wasX;
+
+  const superPunch = punchOnce();
+  const superHurt = takeOne();
+
+  // Run the clock out and check she is entirely herself again.
+  for (let i = 0; i < 8 * 60; i++) baola.update(1 / 60);
+  const reverted = {
+    form: baola.player.actor.root.name,
+    remaining: baola.power.remaining,
+    inScene: baola.scene.children.includes(baola.player.root),
+    formGone: !baola.scene.children.includes(changed.rootWas)
+  };
+  const afterPunch = punchOnce();
+  const afterHurt = takeOne();
+
+  /*
+   * A round that ends mid-transformation must not leave the form swapped in.
+   * The body in the scene is the one dispose() tears down, and the one the next
+   * round would find still standing there.
+   */
+  readyUp();
+  baola.power.meter = baola.power.max;
+  baola.input.press('power');
+  baola.update(1 / 60);
+  const midway = baola.player.actor.root.name;
+  baola.power.clear();
+  const cleared = {
+    from: midway,
+    form: baola.player.actor.root.name,
+    damage: baola.player.damage,
+    vulnerability: baola.player.vulnerability,
+    inScene: baola.scene.children.includes(baola.player.root),
+    remaining: baola.power.remaining
+  };
+
+  for (const enemy of baola.enemies) baola.scene.remove(enemy.root);
+  baola.enemies = [];
+
   // And her ending: she has no celebration clip, so she must fall back to the
   // idle rather than freeze in whatever the last thing she did left her in.
   for (const gate of baola.gates) gate.opened = true;
@@ -959,9 +1066,12 @@ const second = await page.evaluate(async () => {
     chinese: snap.playerNameChinese,
     health: snap.maxHealth,
     speed: baola.player.speed,
-    power: baola.power,
+    kind: baola.power && baola.power.kind,
     rage: snap.rage,
     missing,
+    ordinaryPunch, superPunch, afterPunch,
+    ordinaryHurt, superHurt, afterHurt,
+    ordinaryForm, changed, walkedWhileSuper, reverted, cleared,
     bones: bones.length,
     breathing,
     hasWin: baola.player.actor.has('win'),
@@ -975,11 +1085,38 @@ check('Baola has a clip for every state', second.missing.length === 0,
   second.missing.join(', ') || 'all present');
 check('the two heroes are not identical', second.speed !== 4.1 || second.health !== 100,
   `Baola: ${second.health} hp, speed ${second.speed}`);
-/* Her super is not designed yet, and a bar that fills and does nothing is a
- * worse promise than no bar. The registry is what decides, so this is really a
- * check that it does. */
-check('Baola has no rage meter, because her super is not designed yet',
-  second.power === null && second.rage === null);
+/*
+ * And her super, which is a different move rather than Niulai's with different
+ * numbers. The registry is what decides which one a character gets, so the
+ * first of these is really a check that it does.
+ */
+check('Baola has a meter too, and it buys a different move',
+  second.kind === 'transform' && second.rage !== null, `kind: ${second.kind}`);
+check('casting it turns her into something else',
+  second.changed.form === 'superbaola' && second.changed.named === 'Super Baola',
+  `${second.ordinaryForm} -> ${second.changed.form}`);
+check('the new body takes over the old one\'s place in the scene, not a place beside it',
+  second.changed.inScene && second.changed.oldGone);
+check('it runs for seven seconds', Math.abs(second.changed.remaining - 7) < 0.1,
+  `${second.changed.remaining.toFixed(2)}s`);
+check('and it never holds her still — the seven seconds are hers to fight in',
+  second.changed.locked === 0 && second.walkedWhileSuper > 0.5,
+  `walked ${second.walkedWhileSuper.toFixed(2)} while super`);
+check('she hits twice as hard while it lasts',
+  Math.abs(second.superPunch - second.ordinaryPunch * 2) < 0.01,
+  `${second.superPunch} against ${second.ordinaryPunch}`);
+check('and takes half as much',
+  Math.abs(second.superHurt - second.ordinaryHurt / 2) < 0.01,
+  `${second.superHurt} against ${second.ordinaryHurt}`);
+check('a round ending mid-transformation puts her back',
+  second.cleared.from === 'superbaola' && second.cleared.form === second.ordinaryForm &&
+  second.cleared.inScene && second.cleared.remaining === 0 &&
+  second.cleared.vulnerability === 1,
+  `${second.cleared.from} -> ${second.cleared.form}`);
+check('seven seconds later she is entirely herself again',
+  second.reverted.form === second.ordinaryForm && second.reverted.inScene &&
+  second.afterPunch === second.ordinaryPunch && second.afterHurt === second.ordinaryHurt,
+  `${second.reverted.form}, ${second.afterPunch} damage, ${second.afterHurt} taken`);
 check('a character animates before it is asked to do anything',
   second.breathing > 0, `${second.breathing} of ${second.bones} bones moving on an untouched idle`);
 check('a fighter with no celebration falls back to its idle rather than freezing',

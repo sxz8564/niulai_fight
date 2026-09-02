@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { createActor } from './actor.js';
 
 /*
- * Rage, and what Niulai does with it.
+ * Rage, and the two different things it buys.
  *
  * A brawler needs a moment where the player stops losing. Three wolves and a
  * Cart on the same screen is a situation the ordinary moveset cannot answer —
@@ -15,14 +15,24 @@ import { createActor } from './actor.js';
  * super a consolation prize. Both, weighted toward being hit, means a bad
  * exchange is still progress toward a good one.
  *
- * Spending it: Niulai plants his feet, shouts for his mother, and ten of them
- * come through the stage in parallel lines. Every enemy in a lane gets run
- * over. It is the classic panic button — a screen-clearing move that costs the
- * whole meter and leaves you standing still for a second to earn it.
+ * What it buys depends on who is holding it, and the two are deliberately not
+ * the same move with different numbers:
  *
- * The move lives in the registry, not here. A character without a `power` block
- * has no meter, no bar and no key, which is the honest way to ship a roster
- * where one fighter's super is finished and the other's is not.
+ *   summon      Niulai plants his feet, shouts for his mother, and ten of them
+ *               come through the stage in parallel lines, running down every
+ *               enemy in a lane. The classic panic button: it costs the whole
+ *               meter and a second of standing still, and it answers the one
+ *               situation the moveset cannot — being surrounded.
+ *
+ *   transform   Baola becomes something else for seven seconds. Double damage
+ *               out, half damage in, and no pause at all: she keeps playing,
+ *               and what she does with the seven seconds is hers. It answers
+ *               the opposite problem — a fight she is losing on attrition,
+ *               where what she needs is not the screen cleared but a window in
+ *               which trading hits is finally in her favour.
+ *
+ * Both live in the registry rather than here, down to which one a character
+ * gets. A character without a `power` block has no meter, no bar and no key.
  */
 
 /*
@@ -44,12 +54,20 @@ export class Power {
   constructor(spec, host) {
     this.spec = spec;
     this.host = host;
+    this.kind = spec.kind || 'summon';
     this.meter = 0;
     this.max = 100;
+    this.casts = 0;
+
+    // summon
     this.casting = 0;      // seconds left in the summon pose
     this.released = false; // whether this cast's herd has already been let go
     this.herd = [];
-    this.casts = 0;
+
+    // transform
+    this.remaining = 0;    // seconds left as the other thing
+    this.was = null;       // the actor to go back to
+    this.wasDamage = 0;
 
     /*
      * The shout, loaded up front. Fetching it at the moment of the cast would
@@ -65,8 +83,18 @@ export class Power {
     }
   }
 
-  get ready() { return this.meter >= this.max && this.casting <= 0; }
-  get fraction() { return Math.min(1, this.meter / this.max); }
+  get ready() { return this.meter >= this.max && !this.active; }
+  get active() { return this.casting > 0 || this.remaining > 0; }
+
+  /*
+   * What the bar shows. While a transformation is running it is not a meter
+   * any more, it is a clock — the same bar draining is how the player knows how
+   * many of the seven seconds are left without being given a second widget.
+   */
+  get fraction() {
+    if (this.remaining > 0) return this.remaining / (this.spec.seconds || 7);
+    return Math.min(1, this.meter / this.max);
+  }
 
   /** Rage from something that happened in the fight. */
   gain(what) {
@@ -82,9 +110,12 @@ export class Power {
   cast(player) {
     if (!this.ready || !player.canAct) return false;
     this.meter = 0;
+    this.casts += 1;
+    this.shoutNow();
+    if (this.kind === 'transform') return this.become(player);
+
     this.casting = this.spec.cast || 1.0;
     this.released = false;
-    this.casts += 1;
     player.pose = 'summon';
     player.velocity.set(0, 0, 0);
     player.blocking = false;
@@ -96,13 +127,64 @@ export class Power {
      * move at the only time it is worth using — when they are surrounded.
      */
     player.invulnerable = Math.max(player.invulnerable, this.casting + 0.1);
-
-    if (this.shout) {
-      // A rejected play() is an autoplay policy, not a defect: the game is
-      // still perfectly playable in silence, so it must never throw.
-      try { this.shout.currentTime = 0; this.shout.play().catch(() => {}); } catch { /* silent */ }
-    }
     return true;
+  }
+
+  /** A rejected play() is an autoplay policy, not a defect: the game is still
+   * perfectly playable in silence, so it must never throw. */
+  shoutNow() {
+    if (!this.shout) return;
+    try { this.shout.currentTime = 0; this.shout.play().catch(() => {}); } catch { /* silent */ }
+  }
+
+  /*
+   * Becomes the other thing.
+   *
+   * The swap is of the actor, not the Fighter: health, position, facing, the
+   * meter and every rule about hitstun stay exactly where they were, and only
+   * the body doing it changes. `root` has to move with `actor` because
+   * `Fighter.position` reads through it — a swap that forgot would leave her
+   * fighting from wherever she happened to be standing when the model changed.
+   */
+  become(player) {
+    const id = this.spec.into;
+    const spec = this.host.specs[id];
+    if (!spec) throw new Error(`No form called "${id}" in the registry`);
+
+    const actor = createActor(spec, this.host.gltfs[id]);
+    actor.root.position.copy(player.root.position);
+    actor.setFacing(player.facing);
+    actor.play(player.actor.state);   // carry the pose across, so nothing snaps
+
+    this.host.scene.remove(player.root);
+    this.host.scene.add(actor.root);
+    this.was = player.actor;
+    player.actor = actor;
+    player.root = actor.root;
+
+    this.wasDamage = player.damage;
+    player.damage = player.damage * (this.spec.damage || 2);
+    player.vulnerability = this.spec.toughness ?? 0.5;
+    this.remaining = this.spec.seconds || 7;
+    return true;
+  }
+
+  /** Back to herself, wherever she has got to. */
+  revert(player) {
+    if (!this.was) { this.remaining = 0; return; }
+    const actor = this.was;
+    actor.root.position.copy(player.root.position);
+    actor.setFacing(player.facing);
+    this.host.scene.remove(player.root);
+    this.host.scene.add(actor.root);
+    player.actor = actor;
+    player.root = actor.root;
+    actor.play(player.dead || player.downTimer > 0 ? 'down' : 'idle');
+
+    player.damage = this.wasDamage;
+    player.vulnerability = 1;
+    this.was = null;
+    this.remaining = 0;
   }
 
   /**
@@ -152,6 +234,11 @@ export class Power {
   }
 
   update(dt, player, enemies) {
+    if (this.remaining > 0) {
+      this.remaining -= dt;
+      if (this.remaining <= 0) this.revert(player);
+    }
+
     if (this.casting > 0) {
       this.casting -= dt;
       const elapsed = (this.spec.cast || 1.0) - this.casting;
@@ -233,5 +320,8 @@ export class Power {
     this.herd = [];
     this.casting = 0;
     this.released = false;
+    // Before the scene is torn down or a round ends: a form left swapped in
+    // would take the original's place in the scene graph with it.
+    if (this.was) this.revert(this.host.player);
   }
 }

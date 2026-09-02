@@ -149,6 +149,13 @@ export class Game {
 
   get gate() { return this.gates[this.gateIndex] || null; }
 
+  /** The registry entry for the body the player is currently in, if it is not
+   * their own. */
+  get form() {
+    if (!this.power || this.power.remaining <= 0) return null;
+    return this.specs[this.power.spec.into] || null;
+  }
+
   /** The furthest right the camera — and so the player — may currently go. */
   get boundary() {
     return this.gate ? this.gate.x : STAGE_END;
@@ -521,8 +528,12 @@ export class Game {
   snapshot() {
     return {
       player: this.playerId,
-      playerName: this.specs ? this.specs[this.playerId].name : this.playerId,
-      playerNameChinese: this.specs ? this.specs[this.playerId].nameChinese : '',
+      // While a form is swapped in, the HUD names the thing on screen rather
+      // than the character who chose it — the seven seconds are the point.
+      playerName: this.form ? this.form.name : (this.specs ? this.specs[this.playerId].name : this.playerId),
+      playerNameChinese: this.form
+        ? (this.form.nameChinese || '')
+        : (this.specs ? this.specs[this.playerId].nameChinese : ''),
       health: this.player ? this.player.health : 0,
       maxHealth: this.player ? this.player.maxHealth : 100,
       lives: this.lives,
@@ -541,7 +552,11 @@ export class Game {
         nameChinese: this.power.spec.nameChinese || '',
         fraction: this.power.fraction,
         ready: this.power.ready,
-        casting: this.power.casting > 0
+        casting: this.power.casting > 0,
+        // A running transformation turns the bar into a clock, so the HUD needs
+        // to know which of the two it is drawing.
+        active: this.power.remaining > 0,
+        seconds: this.power.remaining
       } : null,
       boss: this.boss && !this.boss.fighter.dead ? {
         name: this.bossSpec.name,

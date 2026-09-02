@@ -40,16 +40,21 @@ will see and do, not how it is built.
 >
 > Two fighters
 >
-> • Niulai 牛来, steady: more health, hits harder, and he can call his mother.
+> • Niulai 牛来, steady: more health, hits harder.
 > • Baola 豹拉, quick: faster on her feet, easier to hurt.
 >
-> Call your mother
+> Two rage bars, two very different answers
 >
-> Niulai's rage bar fills from both halves of a fight — from landing hits and
-> from taking them. Fill it and one key spends the lot: he plants his feet,
-> shouts for his mother, and ten of her come through the field in parallel
-> lines and run down everything in them. It clears a screen of wolves outright,
-> and it is the best second you will spend on the Cart.
+> Both fill from landing hits and from taking them, and both are spent with one
+> key — but they are not the same move.
+>
+> • Niulai plants his feet and shouts for his mother. Ten of her come through
+>   the field in parallel lines and run down everything in them. It clears a
+>   screen of wolves outright, and it is the best second you will spend on the
+>   Cart.
+> • Baola turns into Super Baola 超级豹拉 for seven seconds: twice the damage
+>   out, half the damage in, and no pause at all. The seven seconds are yours
+>   to fight in.
 >
 > How it plays
 >
@@ -83,12 +88,14 @@ dashboard accepts.
 | Field | File | Size |
 | --- | --- | --- |
 | Store icon | `icon-128.png` | 128 x 128 |
-| Screenshots | `2-fight.png`, `3-mama.png`, `4-boss.png`, `1-select.png`, `5-win.png` | 1280 x 800 |
+| Screenshots | `2-fight.png`, `3-mama.png`, `6-super.png`, `4-boss.png`, `5-win.png` | 1280 x 800 |
 | Small promo tile | `promo-440x280.png` | 440 x 280 |
 | Marquee promo tile | `promo-1400x560.png` | 1400 x 560 |
 
-Upload the screenshots in the order listed — five, which is the most the store
-accepts. It shows the first one largest, and a fight is a better first
+Six are produced and five go up, which is the most the store accepts. Upload
+them in the order listed; `1-select.png` is the spare, and swapping it in for
+one of these is a reasonable call if you would rather lead on the roster than
+on what the two fighters do. It shows the first one largest, and a fight is a better first
 impression than a menu. The stampede goes second because it is the loudest thing
 in the game and nothing else on the page looks like it; the boss third, because
 it is what says the game has an ending. The select screen comes after those:
