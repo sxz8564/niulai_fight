@@ -26,8 +26,11 @@
   .spacer { flex: 1; }
 
   #banner { position: fixed; inset: 0; display: grid; place-items: center;
+            align-content: center; gap: 18px;
             color: #ffd76a; font-size: clamp(22px, 5vw, 54px); letter-spacing: .1em;
-            text-shadow: 0 4px 0 #000; pointer-events: none; }
+            text-shadow: 0 4px 0 #000; pointer-events: none; text-align: center; }
+  #banner .again { color: #f4e7cf; font-size: 14px; letter-spacing: .18em;
+                   text-shadow: 0 2px 0 #000; }
   #loading { position: fixed; inset: 0; display: grid; place-items: center;
              color: #f4e7cf; background: #10141a; font-size: 15px; letter-spacing: .1em; }
   /* An id selector outranks the browser's own [hidden] rule, so setting

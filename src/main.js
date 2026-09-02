@@ -2,15 +2,23 @@ import { Game } from './game/game.js';
 import { chooseCharacter } from './select.js';
 
 /*
- * Bootstrap: build the game, wire the HUD, run the loop.
+ * Bootstrap: choose a fighter, play a round, offer another.
  *
- * `window.__niulaiFight` is deliberately exposed. The smoke test drives the
- * game through it — pressing buttons and reading state — because a brawler
- * that renders beautifully and cannot land a punch still fails, and only
- * playing it finds that out.
+ * Written as a loop rather than a single run, because a brawler that ends and
+ * then requires a page reload to play again is asking the player to do the
+ * browser's job. Losing is supposed to send you straight back in.
+ *
+ * `window.__niulaiFight` is deliberately exposed. The tests drive the game
+ * through it — pressing buttons and reading state — because a brawler that
+ * renders beautifully and cannot land a punch still fails, and only playing it
+ * finds that out.
  */
 
 const canvas = document.getElementById('view');
+const selectScreen = document.getElementById('select');
+const roster = document.getElementById('roster');
+const loading = document.getElementById('loading');
+
 const hud = {
   health: document.getElementById('health'),
   lives: document.getElementById('lives'),
@@ -31,79 +39,131 @@ function paint(state) {
   hud.stage.textContent = `${state.stage}/${state.stages}`;
 
   if (state.over) {
-    hud.banner.textContent = state.won
-      ? `${state.playerNameChinese || ''}赢了  ·  ${(state.playerName || '').toUpperCase()} WINS`.trim()
+    const headline = state.won
+      ? `${state.playerNameChinese || ''}赢了 · ${(state.playerName || '').toUpperCase()} WINS`.trim()
       : 'GAME OVER';
+    hud.banner.innerHTML = '';
+    const big = document.createElement('div');
+    big.textContent = headline;
+    const small = document.createElement('div');
+    small.className = 'again';
+    small.textContent = 'R  play again      ·      C  choose a fighter';
+    hud.banner.append(big, small);
     hud.banner.hidden = false;
-  } else if (state.enemies > 0) {
+  } else {
     hud.banner.hidden = true;
   }
 }
 
-const select = document.getElementById('select');
+/* The harness needs a handle before a human has chosen anything. */
+let offerChoice = null;
+globalThis.__niulaiFight = {
+  choose(id) { if (offerChoice) offerChoice(id); }
+};
 
-/*
- * The test harness needs to exist before a human has chosen anything, so the
- * global is published immediately with just `choose`. Everything else appears
- * on it once a character is picked and the game has loaded.
+/** Shows the select screen and resolves with the chosen character's id. */
+function pickFighter() {
+  roster.innerHTML = '';
+  selectScreen.hidden = false;
+  loading.hidden = true;
+
+  return new Promise((resolve) => {
+    let done = false;
+    const settle = (id) => { if (!done) { done = true; offerChoice = null; resolve(id); } };
+    offerChoice = settle;
+    chooseCharacter('assets/', roster).then(settle);
+  });
+}
+
+/**
+ * Plays one round. Resolves with what to do next: 'again' to replay with the
+ * same fighter, 'select' to go back to the roster.
  */
-let resolveChoice;
-const chosen = new Promise((resolve) => { resolveChoice = resolve; });
-globalThis.__niulaiFight = { choose: (id) => resolveChoice(id) };
+async function playRound(playerId) {
+  selectScreen.hidden = true;
+  loading.hidden = false;
+  hud.banner.hidden = true;
 
-document.getElementById('loading').hidden = true;
-chooseCharacter('assets/', document.getElementById('roster')).then(resolveChoice);
+  const game = new Game(canvas, { onState: paint, playerId });
 
-const playerId = await chosen;
-select.hidden = true;
-document.getElementById('loading').hidden = false;
+  function fit() {
+    game.resize(canvas.clientWidth || window.innerWidth, canvas.clientHeight || window.innerHeight);
+  }
+  await game.load();
+  fit();
+  window.addEventListener('resize', fit);
 
-const game = new Game(canvas, { onState: paint, playerId });
+  for (const button of document.querySelectorAll('[data-action]')) {
+    const action = button.dataset.action;
+    button.onpointerdown = (event) => { event.preventDefault(); game.input.press(action); };
+    button.onpointerup = () => game.input.release(action);
+    button.onpointerleave = () => game.input.release(action);
+    button.onpointercancel = () => game.input.release(action);
+  }
 
-function fit() {
-  const width = canvas.clientWidth || window.innerWidth;
-  const height = canvas.clientHeight || window.innerHeight;
-  game.resize(width, height);
-}
-
-await game.load();
-fit();
-window.addEventListener('resize', fit);
-
-// On-screen buttons, so the game is playable on a phone.
-for (const button of document.querySelectorAll('[data-action]')) {
-  const action = button.dataset.action;
-  const press = (event) => { event.preventDefault(); game.input.press(action); };
-  const release = () => game.input.release(action);
-  button.addEventListener('pointerdown', press);
-  button.addEventListener('pointerup', release);
-  button.addEventListener('pointerleave', release);
-  button.addEventListener('pointercancel', release);
-}
-
-let previous = performance.now();
-let raf = 0;
-function frame(now) {
-  raf = requestAnimationFrame(frame);
-  const dt = (now - previous) / 1000;
-  previous = now;
-  game.update(dt);
-  game.render();
-  paint(game.snapshot());
-}
-raf = requestAnimationFrame(frame);
-
-document.getElementById('loading').hidden = true;
-
-Object.assign(globalThis.__niulaiFight, {
-  game,
-  /** Advances the simulation deterministically, for tests. */
-  step(seconds, slice = 1 / 60) {
-    for (let t = 0; t < seconds; t += slice) game.update(slice);
+  let raf = 0;
+  let previous = performance.now();
+  function frame(now) {
+    raf = requestAnimationFrame(frame);
+    const dt = (now - previous) / 1000;
+    previous = now;
+    game.update(dt);
     game.render();
-    return game.snapshot();
-  },
-  press(action) { game.input.press(action); },
-  release(action) { game.input.release(action); },
-  stop() { cancelAnimationFrame(raf); }
-});
+    paint(game.snapshot());
+  }
+  raf = requestAnimationFrame(frame);
+  loading.hidden = true;
+
+  Object.assign(globalThis.__niulaiFight, {
+    game,
+    /** Advances the simulation deterministically, for tests. */
+    step(seconds, slice = 1 / 60) {
+      for (let t = 0; t < seconds; t += slice) game.update(slice);
+      game.render();
+      return game.snapshot();
+    },
+    press(action) { game.input.press(action); },
+    release(action) { game.input.release(action); },
+    stop() { cancelAnimationFrame(raf); }
+  });
+
+  /*
+   * Wait for the round to end and for the player to say what happens next.
+   * The keys are only listened for once the game is actually over, so R during
+   * a fight does nothing rather than throwing away a run in progress.
+   */
+  const next = await new Promise((resolve) => {
+    function finish(choice) {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('pointerdown', onPointer);
+      resolve(choice);
+    }
+    function onKey(event) {
+      if (!game.over) return;
+      const key = event.key.toLowerCase();
+      if (key === 'r' || key === 'enter') { event.preventDefault(); finish('again'); }
+      else if (key === 'c' || key === 'escape') { event.preventDefault(); finish('select'); }
+    }
+    // A tap anywhere also plays again, so the on-screen pad does not need a
+    // button that exists for one moment in a round.
+    function onPointer() { if (game.over) finish('again'); }
+
+    window.addEventListener('keydown', onKey);
+    window.addEventListener('pointerdown', onPointer);
+    globalThis.__niulaiFight.finish = finish;   // for tests
+  });
+
+  cancelAnimationFrame(raf);
+  window.removeEventListener('resize', fit);
+  hud.banner.hidden = true;
+  game.dispose();
+  delete globalThis.__niulaiFight.game;
+
+  return next;
+}
+
+let fighter = await pickFighter();
+for (;;) {
+  const next = await playRound(fighter);
+  if (next === 'select') fighter = await pickFighter();
+}

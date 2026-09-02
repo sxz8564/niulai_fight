@@ -13,6 +13,11 @@ import { createInput } from './input.js';
  * fight, and with it the level becomes a sequence of small arenas.
  */
 
+/*
+ * The level. Copied per game rather than used directly: `opened` is written to
+ * as a wave is triggered, and a shared array would hand the next run a level
+ * whose gates were all open already — every fight skipped.
+ */
 const GATES = [
   { x: 10, count: 2 },
   { x: 26, count: 3 },
@@ -28,6 +33,7 @@ export class Game {
     this.playerId = options.playerId || 'niulai';
     this.onState = options.onState || (() => {});
     this.enemies = [];
+    this.gates = GATES.map((gate) => ({ ...gate }));
     this.gateIndex = 0;
     this.score = 0;
     this.lives = 3;
@@ -124,7 +130,7 @@ export class Game {
     return fighter;
   }
 
-  get gate() { return GATES[this.gateIndex] || null; }
+  get gate() { return this.gates[this.gateIndex] || null; }
 
   /** The furthest right the camera — and so the player — may currently go. */
   get boundary() {
@@ -318,7 +324,7 @@ export class Game {
     }
     if (gate.opened && this.spawnQueue === 0 && this.enemies.length === 0) {
       this.gateIndex += 1;
-      if (this.gateIndex >= GATES.length) {
+      if (this.gateIndex >= this.gates.length) {
         this.over = true;
         this.won = true;
       }
@@ -365,7 +371,7 @@ export class Game {
       score: this.score,
       enemies: this.enemies.length,
       stage: this.gateIndex + 1,
-      stages: GATES.length,
+      stages: this.gates.length,
       over: this.over,
       won: this.won,
       x: this.player ? this.player.position.x : 0
@@ -380,5 +386,25 @@ export class Game {
 
   render() {
     this.renderer.render(this.scene, this.camera);
+  }
+
+  /**
+   * Releases the renderer and the input listeners. A browser allows only a
+   * handful of WebGL contexts at once, so a game that is finished with has to
+   * give its one back or a few restarts will exhaust them.
+   */
+  dispose() {
+    this.input.dispose();
+    this.scene.traverse((node) => {
+      if (node.geometry) node.geometry.dispose();
+      for (const material of [].concat(node.material || [])) {
+        for (const key of Object.keys(material)) {
+          const value = material[key];
+          if (value && value.isTexture) value.dispose();
+        }
+        material.dispose();
+      }
+    });
+    this.renderer.dispose();
   }
 }

@@ -24,6 +24,11 @@ Pick a fighter first. **Niulai** is steady — more health, hits harder.
 | **J** or **Space** | punch |
 | **K** | kick |
 | **L** or **Shift** (hold) | block |
+| **R** (when it ends) | play again |
+| **C** (when it ends) | choose a different fighter |
+
+Winning or losing does not send you back to the page reload button — the
+banner tells you which key restarts, and a tap anywhere does it too.
 
 Blocking works against what you are facing and not against what you are not,
 which is what makes it a decision about where you are looking rather than a

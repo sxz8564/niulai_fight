@@ -392,6 +392,51 @@ check('Baola has a clip for every state', second.missing.length === 0,
 check('the two heroes are not identical', second.speed !== 4.1 || second.health !== 100,
   `Baola: ${second.health} hp, speed ${second.speed}`);
 
+/*
+ * Restarting. The interesting part is not that a new game appears — it is that
+ * it is a *new* one. The level was a module-level array whose `opened` flags
+ * were written to as waves triggered, so a second run would have started with
+ * every gate already open and every fight skipped.
+ */
+const beforeRestart = await api(() => {
+  const g = globalThis.__niulaiFight.game;
+  g.score = 4321;
+  g.gateIndex = 2;
+  g.gates[0].opened = true;
+  g.over = true;
+  g.won = false;
+  g.onState(g.snapshot());
+  return { score: g.score, stage: g.snapshot().stage, firstGateOpened: g.gates[0].opened };
+});
+check('the banner offers a restart when the game is over',
+  await page.evaluate(() => {
+    const banner = document.getElementById('banner');
+    return !banner.hidden && /play again/i.test(banner.textContent);
+  }), 'banner shown');
+
+await page.keyboard.press('r');
+await page.waitForFunction(() => globalThis.__niulaiFight.game, null, { timeout: 60000 });
+
+const afterRestart = await api(() => {
+  const g = globalThis.__niulaiFight.game;
+  return {
+    score: g.score,
+    stage: g.snapshot().stage,
+    over: g.over,
+    anyGateOpened: g.gates.some((gate) => gate.opened),
+    player: g.snapshot().player,
+    health: g.player.health
+  };
+});
+check('R starts a fresh round', afterRestart.over === false && afterRestart.score === 0,
+  `score ${beforeRestart.score} -> ${afterRestart.score}`);
+check('the restarted level has all its gates shut again', !afterRestart.anyGateOpened,
+  afterRestart.anyGateOpened ? 'a gate was still open' : 'all shut');
+check('restarting keeps the fighter you chose', afterRestart.player === 'niulai',
+  afterRestart.player);
+check('the banner is gone once play resumes',
+  await page.evaluate(() => document.getElementById('banner').hidden));
+
 check('still no script errors after playing', errors.length === 0, errors[0] || '');
 
 if (transients.length) {
