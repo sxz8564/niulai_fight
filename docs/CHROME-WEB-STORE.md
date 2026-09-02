@@ -74,6 +74,12 @@ will see and do, not how it is built.
 > answer is to step off it — and then to hit it while it is stalled, because
 > that is the only moment it cannot hit you back.
 >
+> Sound
+>
+> Impacts, a body hitting the ground, an engine spooling up before the Cart
+> comes at you, and a theme under all of it. One switch on the opening screen
+> turns the music off and remembers you did.
+>
 > No account, no sign-in, no internet
 >
 > The whole game is inside the extension. It asks for no permissions at all,

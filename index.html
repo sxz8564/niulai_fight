@@ -72,6 +72,14 @@
   #select h1 span { color: #ffd76a; }
   #select p { color: #8b95a3; font-size: 13px; letter-spacing: .1em; margin: 0 0 14px; }
   #select .foot { margin-top: 18px; font-size: 11px; }
+  /* The music switch. Small, out of the way of the roster, and readable from
+     across the room because it is the one control on this screen that is not a
+     character. */
+  #music { margin-top: 14px; background: none; border: 2px solid #39424f;
+           border-radius: 999px; color: #8b95a3; font: inherit; font-size: 11px;
+           letter-spacing: .16em; padding: 7px 16px; cursor: pointer; }
+  #music:hover, #music:focus-visible { border-color: #ffd76a; color: #ffd76a; outline: none; }
+  #music[aria-pressed="false"] { color: #5d6773; border-color: #2b323c; }
   #roster { display: flex; gap: 18px; flex-wrap: wrap; justify-content: center; }
   /* Each card carries its own little renderer, so the roster shows the actual
      models rather than art that could drift from them. */
@@ -129,6 +137,7 @@
   <p>Choose a fighter</p>
   <div id="roster"></div>
   <p class="foot">1 / 2 or click · then ← → to move, J punch, K kick, L block</p>
+  <button id="music" type="button" aria-pressed="true">♪ MUSIC ON</button>
 </div>
 <div id="loading">LOADING…</div>
 

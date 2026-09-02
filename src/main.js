@@ -107,9 +107,25 @@ function paint(state) {
   }
 }
 
-/* The harness needs a handle before a human has chosen anything. */
+/*
+ * The music switch. Wired once rather than per visit to the roster — the button
+ * is part of the page, not part of the screen that keeps being rebuilt, and
+ * listeners that stack up would toggle it twice on the second round.
+ */
+const sounds = soundBank('assets/');
+const musicButton = document.getElementById('music');
+function paintMusic(on) {
+  musicButton.textContent = on ? '♪ MUSIC ON' : '♪ MUSIC OFF';
+  musicButton.setAttribute('aria-pressed', String(on));
+}
+paintMusic(sounds.musicOn);
+musicButton.addEventListener('click', () => paintMusic(sounds.toggleMusic()));
+
+/* The harness needs a handle before a human has chosen anything — and the
+ * sound bank outlives every round, so it hangs here rather than off the game. */
 let offerChoice = null;
 globalThis.__niulaiFight = {
+  sounds,
   choose(id) { if (offerChoice) offerChoice(id); }
 };
 
@@ -118,6 +134,9 @@ function pickFighter() {
   roster.innerHTML = '';
   selectScreen.hidden = false;
   loading.hidden = true;
+  // Asked for every time the roster appears, because the first attempt is the
+  // one autoplay policy is most likely to refuse.
+  sounds.startMusic('theme');
 
   return new Promise((resolve) => {
     let done = false;
@@ -128,7 +147,7 @@ function pickFighter() {
       if (done) return;
       done = true;
       offerChoice = null;
-      soundBank('assets/').play('confirm');
+      sounds.play('confirm');
       resolve(id);
     };
     offerChoice = settle;

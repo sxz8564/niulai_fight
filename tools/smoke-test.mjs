@@ -1347,6 +1347,66 @@ check('running out of lives sounds like losing',
 check('and clearing the last stage sounds like winning',
   bigMoments.winning.join() === 'win', bigMoments.winning.join(', ') || 'silence');
 
+/*
+ * The music, and its switch.
+ *
+ * The track is one element that keeps its place rather than a pool of voices —
+ * giving it voices would mean the music restarting on top of itself — and the
+ * preference outlives the page, because a player who turns it off does not want
+ * to be asked again.
+ */
+const theme = await api(() => {
+  const sounds = globalThis.__niulaiFight.sounds;
+  const entry = sounds.bank.get('theme');
+  const audio = entry && entry.voices[0];
+  return entry ? {
+    loop: entry.loop && audio.loop,
+    voices: entry.voices.length,
+    seconds: audio.duration,
+    error: audio.error ? audio.error.code : null,
+    volume: audio.volume
+  } : null;
+});
+check('the theme is a single looping track the browser can decode',
+  theme && theme.loop && theme.voices === 1 && theme.error === null && theme.seconds > 0,
+  theme ? `${theme.seconds.toFixed(1)}s at ${theme.volume}` : 'no theme in the bank');
+
+// A real keypress first: the switch turning the music *on* has to be able to
+// start it, and a browser will not start anything until the page has been
+// touched.
+await page.keyboard.press('KeyQ');
+const stored = () => page.evaluate(() => {
+  try { return localStorage.getItem('niulai-fight.music'); } catch { return 'unavailable'; }
+});
+const label = () => page.evaluate(() => {
+  const button = document.getElementById('music');
+  return { text: button.textContent, pressed: button.getAttribute('aria-pressed') };
+});
+
+const off = await api(() => {
+  const sounds = globalThis.__niulaiFight.sounds;
+  document.getElementById('music').click();
+  return { on: sounds.musicOn, playing: sounds.musicPlaying };
+});
+const offStored = await stored();
+const offLabel = await label();
+check('the switch turns the music off', off.on === false && off.playing === false,
+  `on=${off.on} playing=${off.playing}`);
+check('and says so', offLabel.text.includes('OFF') && offLabel.pressed === 'false', offLabel.text);
+check('and remembers it', offStored === 'off', String(offStored));
+
+const on = await api(() => {
+  const sounds = globalThis.__niulaiFight.sounds;
+  document.getElementById('music').click();
+  return { on: sounds.musicOn, playing: sounds.musicPlaying };
+});
+const onStored = await stored();
+const onLabel = await label();
+check('and turns it back on', on.on === true && on.playing === true,
+  `on=${on.on} playing=${on.playing}`);
+check('and says that too', onLabel.text.includes('ON') && onLabel.pressed === 'true', onLabel.text);
+check('and remembers that', onStored === 'on', String(onStored));
+
 /* ------------------------------------------------------------ the ending --
  *
  * Winning used to stop the frame. That is right for a loss — the player is on

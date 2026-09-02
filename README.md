@@ -59,6 +59,7 @@ library — for a handful of impacts that is the whole job.
 | **charge** | the Cart's engine, on the wind-up |
 | **win**, **loss** | the two ways a run ends |
 | **select**, **confirm** | moving across the roster, and choosing |
+| **theme** | a twenty-second loop, under everything |
 
 **Punches and kicks are the player's only.** The wolves throwing the same sound
 back would turn a crowd into noise, and the point of these is that a player can
@@ -92,9 +93,32 @@ is that every file in the bank is one the browser can decode, and that the right
 event makes the right noise — recorded by standing in for `play` rather than by
 listening, since a muted test machine would answer no to everything.
 
-Everything is Opus in WebM, including the sources that arrived as Ogg Vorbis and
-24-bit WAV: one format the whole toolchain and both test suites already know how
-to check.
+### The music, and its switch
+
+The theme is one element that keeps its place rather than a pool of voices —
+giving it voices would mean the music restarting on top of itself. It runs
+under the roster and stays running through the fight.
+
+The switch is on the intro screen and the preference outlives the page: a player
+who turns it off does not want to be asked again. On unless it has been turned
+off, because a game that opens silent looks broken to someone who never finds
+the button.
+
+Starting it is the fiddly part, and it took two goes:
+
+- **Autoplay policy refuses audio before a page has been interacted with**, and
+  the roster appears before anyone has done anything. A refusal arms a one-shot
+  listener, so the music comes in on the first click or keypress — on a screen
+  whose entire job is to be clicked, a moment away.
+- **The manifest is still in the air the first time the music is asked for.**
+  The first version returned quietly when the track was not in the bank yet,
+  which meant it never started *and* never armed the fallback above: silent,
+  with nothing to suggest anything had gone wrong. It now retries when the
+  manifest lands.
+
+Everything is Opus in WebM, including the sources that arrived as MP3, Ogg
+Vorbis and 24-bit WAV: one format the whole toolchain and both test suites
+already know how to check.
 
 ```bash
 ffmpeg -i in.wav -vn -c:a libopus -b:a 64k -ar 48000 assets/audio/out.webm

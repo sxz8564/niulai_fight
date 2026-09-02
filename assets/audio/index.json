@@ -38,5 +38,10 @@
     "file": "loss.webm",
     "volume": 0.6,
     "voices": 1
+  },
+  "theme": {
+    "file": "theme.webm",
+    "volume": 0.3,
+    "loop": true
   }
 }
