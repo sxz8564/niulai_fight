@@ -112,6 +112,16 @@ and every rule about hitstun stay where they were, and only the body doing it
 changes. The bar becomes a clock while it runs, in a different colour, so a
 half-full bar never means two things.
 
+**She grows into it.** The new body appears at exactly the size the old one was
+standing at, eases up to its own over about half a second — overshooting a
+little and settling, so it looks like something happening to her rather than a
+slider being dragged — and eases back down before it hands her body back.
+Appearing at full size on the swap frame read as a glitch instead of a
+transformation: one frame a leopard cub, the next a jaguar warrior a third again
+as tall, with nothing on screen connecting the two. Both the growth and the
+shrink happen *inside* the seven seconds, so the number on the bar is the number
+of seconds she is actually stronger for.
+
 Which of the two a character gets is `kind` in the registry — `summon` or
 `transform`. A character with no `power` block still gets no meter, no key and
 no bar.

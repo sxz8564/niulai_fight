@@ -1006,6 +1006,25 @@ const second = await page.evaluate(async () => {
     oldGone: !baola.scene.children.includes(ordinaryRoot)
   };
 
+  /*
+   * The growth. Appearing at full size on the swap frame reads as a glitch
+   * rather than a transformation — one frame a leopard cub, the next a jaguar
+   * warrior a third again as tall, with nothing on screen connecting the two.
+   * So it starts at the size the old body was standing at, rises, overshoots a
+   * little and settles.
+   */
+  const scales = [baola.player.root.scale.x];
+  for (let i = 0; i < 36; i++) {
+    baola.update(1 / 60);
+    scales.push(baola.player.root.scale.x);
+  }
+  const growth = {
+    first: scales[0],
+    peak: Math.max(...scales),
+    settled: scales[scales.length - 1],
+    rose: scales.slice(0, 10).every((v, i, a) => i === 0 || v > a[i - 1])
+  };
+
   // Not held in place, unlike the summon.
   const wasX = baola.player.position.x;
   baola.input.press('right');
@@ -1016,10 +1035,24 @@ const second = await page.evaluate(async () => {
   const superPunch = punchOnce();
   const superHurt = takeOne();
 
+  // Run the clock down to the last of it, and watch her come back down with it.
+  for (let i = 0; i < 10 * 60 && baola.power.remaining > 0.28; i++) baola.update(1 / 60);
+  const shrinking = [];
+  for (let i = 0; i < 60 && baola.power.remaining > 0; i++) {
+    baola.update(1 / 60);
+    if (baola.power.remaining > 0) shrinking.push(baola.player.root.scale.x);
+  }
+  const cameDown = {
+    samples: shrinking.length,
+    from: shrinking[0],
+    to: shrinking[shrinking.length - 1]
+  };
+
   // Run the clock out and check she is entirely herself again.
-  for (let i = 0; i < 8 * 60; i++) baola.update(1 / 60);
+  for (let i = 0; i < 2 * 60; i++) baola.update(1 / 60);
   const reverted = {
     form: baola.player.actor.root.name,
+    scale: baola.player.root.scale.x,
     remaining: baola.power.remaining,
     inScene: baola.scene.children.includes(baola.player.root),
     formGone: !baola.scene.children.includes(changed.rootWas)
@@ -1071,7 +1104,7 @@ const second = await page.evaluate(async () => {
     missing,
     ordinaryPunch, superPunch, afterPunch,
     ordinaryHurt, superHurt, afterHurt,
-    ordinaryForm, changed, walkedWhileSuper, reverted, cleared,
+    ordinaryForm, changed, walkedWhileSuper, reverted, cleared, growth, cameDown,
     bones: bones.length,
     breathing,
     hasWin: baola.player.actor.has('win'),
@@ -1097,6 +1130,19 @@ check('casting it turns her into something else',
   `${second.ordinaryForm} -> ${second.changed.form}`);
 check('the new body takes over the old one\'s place in the scene, not a place beside it',
   second.changed.inScene && second.changed.oldGone);
+check('she grows into it rather than appearing at full size',
+  second.growth.first < 0.85 && second.growth.rose,
+  `starts at ${second.growth.first.toFixed(3)} of full size and rises`);
+check('the growth overshoots a little and settles exactly',
+  second.growth.peak > 1.01 && second.growth.settled === 1,
+  `peaks at ${second.growth.peak.toFixed(3)}, settles at ${second.growth.settled}`);
+check('and she comes back down at the end rather than popping out',
+  second.cameDown.samples > 3 && second.cameDown.to < second.cameDown.from &&
+  second.cameDown.to < 0.85,
+  `${second.cameDown.from.toFixed(3)} -> ${second.cameDown.to.toFixed(3)} over ` +
+  `${second.cameDown.samples} frames`);
+check('and the body she comes back to is her own size',
+  second.reverted.scale === 1, `scale ${second.reverted.scale}`);
 check('it runs for seven seconds', Math.abs(second.changed.remaining - 7) < 0.1,
   `${second.changed.remaining.toFixed(2)}s`);
 check('and it never holds her still — the seven seconds are hers to fight in',

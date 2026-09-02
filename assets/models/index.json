@@ -167,7 +167,7 @@
       "kind": "transform",
       "name": "SUPER",
       "nameChinese": "超级",
-      "_comment": "Baola's super is not a screen-clear like Niulai's — it is seven seconds of being a different animal. Double damage out, half damage in, and a model swap so the player can see which of those seven seconds they are in without reading a bar. She is not locked in place for it: the whole point is that she gets to spend the time fighting.",
+      "_comment": "Baola's super is not a screen-clear like Niulai's — it is seven seconds of being a different animal. Double damage out, half damage in, and a model swap so the player can see which of those seven seconds they are in without reading a bar. She is not locked in place for it: the whole point is that she gets to spend the time fighting. grow and shrink are the seconds the new body spends easing up to its own size and back down to hers, and both happen inside the seven, so the number on the bar is the number of seconds she is actually stronger for.",
       "into": "superbaola",
       "seconds": 7,
       "damage": 2,
@@ -176,7 +176,9 @@
         "dealt": 3.5,
         "taken": 6,
         "killed": 5
-      }
+      },
+      "grow": 0.45,
+      "shrink": 0.3
     }
   },
   {

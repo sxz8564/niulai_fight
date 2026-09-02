@@ -68,6 +68,7 @@ export class Power {
     this.remaining = 0;    // seconds left as the other thing
     this.was = null;       // the actor to go back to
     this.wasDamage = 0;
+    this.small = 1;        // her own size, as a fraction of the form's
 
     /*
      * The shout, loaded up front. Fetching it at the moment of the cast would
@@ -156,6 +157,20 @@ export class Power {
     actor.setFacing(player.facing);
     actor.play(player.actor.state);   // carry the pose across, so nothing snaps
 
+    /*
+     * Start the new body at exactly her size and let it grow into its own.
+     *
+     * Swapping straight to full size reads as a glitch rather than a
+     * transformation: one frame she is a leopard cub, the next a jaguar warrior
+     * a third again as tall, and nothing on screen connects the two. Beginning
+     * at the size the old body was standing at means the only thing that
+     * changes on the swap frame is the mesh, and the growth that follows is the
+     * part the player actually watches.
+     */
+    const mine = this.host.specs[this.host.playerId];
+    this.small = (mine && mine.scale ? mine.scale : 1) / (spec.scale || 1);
+    actor.root.scale.setScalar(this.small);
+
     this.host.scene.remove(player.root);
     this.host.scene.add(actor.root);
     this.was = player.actor;
@@ -169,6 +184,34 @@ export class Power {
     return true;
   }
 
+  /*
+   * How big the swapped-in body is right now.
+   *
+   * Growing and shrinking both happen *inside* the seven seconds rather than
+   * around them, so the number on the bar is the number of seconds she is
+   * actually stronger for. The way up overshoots a little and settles — a
+   * transformation should look like something happening to her, not like a
+   * slider being dragged — and the way down is a plain ease, because the end of
+   * a super wants no fanfare at all.
+   */
+  size(left) {
+    const total = this.spec.seconds || 7;
+    const up = this.spec.grow ?? 0.45;
+    const down = this.spec.shrink ?? 0.3;
+    const elapsed = total - left;
+
+    let k = 1;
+    if (elapsed < up) {
+      const t = elapsed / up;
+      const c1 = 1.70158;
+      k = 1 + (c1 + 1) * (t - 1) ** 3 + c1 * (t - 1) ** 2;   // ease out, past 1
+    } else if (left < down) {
+      const t = Math.max(0, left / down);
+      k = t * t * (3 - 2 * t);
+    }
+    return this.small + (1 - this.small) * k;
+  }
+
   /** Back to herself, wherever she has got to. */
   revert(player) {
     if (!this.was) { this.remaining = 0; return; }
@@ -179,6 +222,7 @@ export class Power {
     this.host.scene.add(actor.root);
     player.actor = actor;
     player.root = actor.root;
+    player.root.scale.setScalar(1);
     actor.play(player.dead || player.downTimer > 0 ? 'down' : 'idle');
 
     player.damage = this.wasDamage;
@@ -236,7 +280,8 @@ export class Power {
   update(dt, player, enemies) {
     if (this.remaining > 0) {
       this.remaining -= dt;
-      if (this.remaining <= 0) this.revert(player);
+      if (this.remaining > 0) player.root.scale.setScalar(this.size(this.remaining));
+      else this.revert(player);
     }
 
     if (this.casting > 0) {
