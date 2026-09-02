@@ -1,0 +1,139 @@
+# Publishing Niulai Fight
+
+Everything here is prepared. What is left needs your Google account.
+
+```bash
+npm run store      # dist/store/ — icons, screenshots, both promo tiles
+npm run package    # dist/niulai-fight-<version>.zip — the upload
+```
+
+`store` plays the real game to take its screenshots and builds the tiles from
+one of those frames, so the artwork cannot promise something the game does not
+do. The icon is rendered separately: at 16 pixels a cropped screenshot is mud,
+and the only thing that survives is a silhouette.
+
+## The listing
+
+**Category:** Games. **Language:** English (United States).
+
+### Name
+
+> Niulai Fight 牛来大战
+
+### Summary
+
+The line under the title in search results. End-user copy — plain words, no
+jargon. This lives in `manifest.json`.
+
+> A side-scrolling brawler in a browser tab. Pick a fighter, walk right, and
+> punch your way through five stages of wolves.
+
+### Description
+
+Written for someone deciding whether to install, not for a developer. What they
+will see and do, not how it is built.
+
+> Turn a browser tab into a Famicom-era beat 'em up.
+>
+> Walk right. The screen stops. Wolves arrive. Clear them and the screen lets
+> you on — five stages of it, through woods and grassland.
+>
+> Two fighters
+>
+> • Niulai 牛来, steady: more health, hits harder.
+> • Baola 豹拉, quick: faster on her feet, easier to hurt.
+>
+> How it plays
+>
+> • Punch, kick, and hold to block. Blocking works against what you are facing
+>   and not against what you are behind, so where you are looking matters.
+> • Step up and down as well as left and right. A wolf standing further up the
+>   field cannot hit you, and you cannot hit it — circling is how you handle
+>   three at once.
+> • Lose all your health and you go down. Lose three times and it is over, and
+>   one key starts you again.
+>
+> No account, no sign-in, no internet
+>
+> The whole game is inside the extension. It asks for no permissions at all,
+> makes no network requests, and cannot see any other page you have open. It
+> works with the wifi off.
+
+### Graphics
+
+Every file below is produced into `dist/store/` at exactly the sizes the
+dashboard accepts.
+
+| Field | File | Size |
+| --- | --- | --- |
+| Store icon | `icon-128.png` | 128 x 128 |
+| Screenshots | `2-fight.png`, `1-select.png`, `3-block.png`, `4-again.png` | 1280 x 800 |
+| Small promo tile | `promo-440x280.png` | 440 x 280 |
+| Marquee promo tile | `promo-1400x560.png` | 1400 x 560 |
+
+Upload the screenshots in the order listed. The store shows the first one
+largest, and a fight is a better first impression than a menu — but the select
+screen belongs second, because two characters is the reason to install rather
+than a detail.
+
+The marquee is optional and only matters if the store ever features the
+extension. It costs nothing to supply and a listing without one looks
+unfinished next to those that have it.
+
+## Privacy practices
+
+This is the easiest listing you will ever fill in, because the honest answer to
+almost everything is "none".
+
+**Single purpose:**
+
+> A single-player side-scrolling fighting game that runs in its own tab. That
+> is the extension's only function.
+
+**Permission justification:** there are none to justify. The extension declares
+no `permissions` and no `host_permissions`. If the form insists on something:
+
+> The extension requests no permissions. Clicking its toolbar button opens a
+> page packaged inside the extension itself, which needs no permission, and it
+> never interacts with any other site.
+
+**Remote code** — answer **No, I am not using remote code**. If a box appears:
+
+> All JavaScript, the 3D models and the artwork are packaged inside the
+> extension. It makes no network requests of any kind and evaluates no code
+> fetched at runtime.
+
+**Data usage** — leave every collected-data category unticked and certify all
+three statements. They are true and testable: the extension has no network
+code, stores nothing, and asks for no identity.
+
+## URLs
+
+| Field | Use |
+| --- | --- |
+| Homepage | `https://github.com/sxz8564/niulai_fight` |
+| Support | `https://github.com/sxz8564/niulai_fight/issues` |
+| Privacy policy | `https://github.com/sxz8564/niulai_fight/blob/main/PRIVACY.md` |
+
+All three need the repository to be public. A URL the reviewer cannot open is a
+rejection.
+
+## Before you submit
+
+- [ ] Bump `version` in `manifest.json`. The store rejects a version it has
+      already seen.
+- [ ] Check the zip actually runs: unpack it somewhere else and load *that*
+      folder unpacked, not the repository. A missing build artifact is exactly
+      the failure that reached a player last time.
+- [ ] Decide public or unlisted. Unlisted still goes through review but is
+      reachable only by link — a reasonable way to hand it to a few people
+      first.
+- [ ] The name is 22 characters, well inside the 45 the store allows, so it
+      will display in full everywhere.
+
+## A note on the artwork
+
+The characters are the repository owner's own and are **not** covered by the
+MIT licence on the code — see `NOTICE.md`. That distinction matters more for a
+store listing than a repository, because a listing is where someone decides
+what they are allowed to reuse.

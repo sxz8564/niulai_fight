@@ -12,7 +12,8 @@
     "package": "node tools/package.mjs",
     "test:extension": "node tools/extension-test.mjs",
     "models": "node tools/merge-animations.mjs",
-    "clips": "node tools/clip-sheet.mjs"
+    "clips": "node tools/clip-sheet.mjs",
+    "store": "node tools/make-store.mjs"
   },
   "dependencies": {
     "three": "0.185.1"
