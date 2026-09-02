@@ -88,10 +88,26 @@ await page.evaluate(() => {
     wolf.root.position.set(g.player.position.x + 1.4 + (i % 3) * 0.85, 0, -1.1 + i * 0.55);
     wolf.stunTimer = 0; wolf.attackTimer = 0; wolf.thinkTimer = 99;
   });
+  /*
+   * Stand him up again immediately before pressing. Two and a half seconds of
+   * four wolves leaves him in hitstun as often as not, and the super is not
+   * buffered — a press while he cannot act is dropped, and the shot comes back
+   * with a full meter and no herd. It got lucky the first few times this ran.
+   */
   g.player.facing = 1;
+  g.player.health = g.player.maxHealth;
+  g.player.dead = false;
+  g.player.downTimer = 0;
+  g.player.stunTimer = 0;
+  g.player.attackTimer = 0;
+  g.player.invulnerable = 0;
+  g.player.blocking = false;
+  g.buffered = null;
   g.power.meter = g.power.max;
   api.press('power');
-  api.step(2.2);           // the front rank reaching the wolves, the rest still coming
+  api.step(0.1);
+  if (g.power.casting <= 0) throw new Error('the super did not fire — nothing to photograph');
+  api.step(4.3);           // the front rank reaching the wolves, the rest still coming
   g.onState(g.snapshot());
 });
 await page.screenshot({ path: join(out, '3-mama.png'), animations: 'disabled' });

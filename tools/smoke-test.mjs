@@ -782,6 +782,47 @@ check('the summon pose is let go when the cast ends', cast.pose === null, String
 check('the herd clears itself off the field', cast.left === 0, `${cast.left} left in the scene`);
 
 /*
+ * And it clears itself even from a player who walks away from it.
+ *
+ * The herd used to retire on leaving the picture, which was safe while it
+ * outran everyone. It crosses at less than walking pace now, so a player
+ * heading right moves the camera — and with it the finish line — away faster
+ * than the cows advance on it, and a cow that can never reach it never leaves
+ * the scene. Ten more every cast, for ever.
+ */
+const trailing = await api(() => {
+  const g = globalThis.__niulaiFight.game;
+  const gate = g.gates[g.gateIndex];
+  const wall = gate.x;
+  gate.x = 400;                  // no gate in the way of the measurement
+  for (const e of g.enemies) g.scene.remove(e.root);
+  g.enemies = []; g.boss = null; g.spawnQueue = 0;
+  g.power.clear();
+  g.player.position.set(0, 0, 0.2);
+  g.player.health = g.player.maxHealth;
+  g.player.dead = false; g.player.downTimer = 0; g.player.stunTimer = 0;
+  g.player.attackTimer = 0; g.player.blocking = false;
+  g.buffered = null;
+  g.power.meter = g.power.max;
+
+  globalThis.__niulaiFight.press('power');
+  globalThis.__niulaiFight.step(1.2);
+  const released = g.power.herd.length;
+
+  globalThis.__niulaiFight.press('right');
+  for (let i = 0; i < 40; i++) globalThis.__niulaiFight.step(0.5);
+  globalThis.__niulaiFight.release('right');
+
+  const left = g.power.herd.length;
+  gate.x = wall;
+  g.player.position.set(0, 0, 0.2);
+  return { released, left, walkedTo: g.player.position.x };
+});
+check('the herd retires even when the player walks away from it',
+  trailing.released === 10 && trailing.left === 0,
+  `${trailing.released} released, ${trailing.left} still following after 20s of walking`);
+
+/*
  * The shout has to be a format the browser will actually decode.
  *
  * The first cut of this shipped the m4a as supplied, which plays in Chrome and

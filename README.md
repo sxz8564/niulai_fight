@@ -61,11 +61,22 @@ once per cow that reaches it, which clears a screen of wolves outright and takes
 about half the Cart's health, since the Cart is wide enough for several lanes to
 find it at once.
 
-They cross at seven and a half units a second — slow enough to watch, which for
-the one spectacle in the game is the point. Both that and the meter's fill rate
-live in the registry's `power` block, and the tests read the herd until it is
-gone rather than for a fixed number of seconds, so re-tuning either does not
-turn the suite red.
+They cross at 2.75 units a second — slower than the hero walks, and slow enough
+to watch, which for the one spectacle in the game is the point. Their legs
+follow: the gallop is scaled by how fast the herd is actually travelling against
+the speed the clip was authored for, so slowing it down does not turn it into
+skating.
+
+Both that and the meter's fill rate live in the registry's `power` block, and
+the tests read the herd until it is gone rather than for a fixed number of
+seconds, so re-tuning either does not turn the suite red.
+
+A cow retires after `range` units as well as on leaving the picture, and that
+second rule is not belt-and-braces. The finish line is measured from the camera
+and the camera follows the player — safe while the herd outran everyone, but at
+less than walking pace a player heading right moves the line away faster than
+the cows advance on it, and a cow that can never reach it never leaves the
+scene. Ten more every cast, for ever.
 
 The weighting is the design. Rewarding only aggression would withhold the button
 from the player who is losing, which is exactly who needs it; rewarding only

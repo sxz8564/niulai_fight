@@ -142,7 +142,12 @@ export class Power {
       actor.root.scale.setScalar(size);
 
       host.scene.add(actor.root);
-      this.herd.push({ actor, hit: new Set(), speed: 0.92 + Math.random() * 0.16 });
+      this.herd.push({
+        actor,
+        hit: new Set(),
+        speed: 0.92 + Math.random() * 0.16,
+        from: actor.root.position.x
+      });
     }
   }
 
@@ -164,11 +169,20 @@ export class Power {
     const speed = this.spec.speed || 15;
     const damage = this.spec.damage || 18;
     const finish = this.host.camera.position.x + 12;
+    /*
+     * Legs at the speed the legs are actually carrying her.
+     *
+     * The gallop was authored to look right at `gallopAt`; playing it at full
+     * rate while the herd crosses at a quarter of that is the skating look the
+     * rest of the game goes out of its way to avoid. The actor floors the gait
+     * so nobody freezes mid-stride.
+     */
+    const gait = speed / (this.spec.gallopAt || 15);
 
     for (const cow of this.herd) {
       const at = cow.actor.root.position;
       at.x += speed * cow.speed * dt;
-      cow.actor.update(dt, 1);
+      cow.actor.update(dt, gait * cow.speed);
 
       for (const enemy of enemies) {
         if (enemy.dead || cow.hit.has(enemy)) continue;
@@ -193,10 +207,22 @@ export class Power {
       }
     }
 
-    const gone = this.herd.filter((cow) => cow.actor.root.position.x > finish);
+    /*
+     * Retire on distance as well as on leaving the picture.
+     *
+     * `finish` is measured from the camera, and the camera follows the player.
+     * That was safe while the herd outran anyone — but at the speed it crosses
+     * at now, a player walking right moves the finish line away faster than the
+     * cows advance on it, and a cow that can never reach it never leaves the
+     * scene. One more cast, ten more, for ever.
+     */
+    const range = this.spec.range || 30;
+    const spent = (cow) => cow.actor.root.position.x > finish ||
+      cow.actor.root.position.x - cow.from > range;
+    const gone = this.herd.filter(spent);
     if (gone.length) {
       for (const cow of gone) this.host.scene.remove(cow.actor.root);
-      this.herd = this.herd.filter((cow) => cow.actor.root.position.x <= finish);
+      this.herd = this.herd.filter((cow) => !spent(cow));
     }
   }
 
