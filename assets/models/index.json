@@ -74,19 +74,19 @@
     "power": {
       "name": "MAMA",
       "nameChinese": "妈妈",
-      "_comment": "Niulai's super. The meter fills from hitting and from being hit, and spends itself on one shout: ten mamas across the whole stage. Cast is how long he is locked in the summon pose; release is how far into it the herd arrives — timed to the frame his arms go up, because a summon whose effect precedes the gesture reads as a bug.",
+      "_comment": "Niulai's super. The meter fills from hitting and from being hit, and spends itself on one shout: ten mamas across the whole stage. Cast is how long he is locked in the summon pose; release is how far into it the herd arrives — timed to the frame his arms go up, because a summon whose effect precedes the gesture reads as a bug. The gains and the herd's speed are both half what they first were: the meter filled inside a single wave, which made a screen-clearing move something you spent because it was there rather than because you needed it, and the herd crossed the picture faster than anyone could enjoy watching it.",
       "cast": 1.0,
       "release": 0.45,
       "shout": "audio/mama.webm",
       "summon": "mama",
       "count": 10,
       "lanes": 5,
-      "speed": 15.0,
+      "speed": 7.5,
       "damage": 18,
       "gain": {
-        "dealt": 7,
-        "taken": 12,
-        "killed": 10
+        "dealt": 3.5,
+        "taken": 6,
+        "killed": 5
       }
     }
   },

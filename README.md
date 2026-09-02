@@ -49,15 +49,23 @@ and you cannot hit it. Circling is how you fight three at once.
 
 ## Rage, and mama
 
-Niulai has a meter. It fills from **both** halves of a fight — seven for landing
-a hit, twelve for taking one, ten for finishing a wolf — and when it is full,
-**M** spends the lot.
+Niulai has a meter. It fills from **both** halves of a fight — three and a half
+for landing a hit, six for taking one, five for finishing a wolf — and when it
+is full, **M** spends the lot. That is around seven wolves' worth, so it arrives
+somewhere in the middle of the level rather than inside the first wave: a
+screen-clearing move you spend because you need it, not because it is there.
 
 He plants his feet, shouts for his mother, and ten of her come through the stage
 in five parallel lines, running everything down. Every enemy in a lane is hit
 once per cow that reaches it, which clears a screen of wolves outright and takes
 about half the Cart's health, since the Cart is wide enough for several lanes to
 find it at once.
+
+They cross at seven and a half units a second — slow enough to watch, which for
+the one spectacle in the game is the point. Both that and the meter's fill rate
+live in the registry's `power` block, and the tests read the herd until it is
+gone rather than for a fixed number of seconds, so re-tuning either does not
+turn the suite red.
 
 The weighting is the design. Rewarding only aggression would withhold the button
 from the player who is losing, which is exactly who needs it; rewarding only

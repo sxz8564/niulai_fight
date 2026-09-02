@@ -91,7 +91,7 @@ await page.evaluate(() => {
   g.player.facing = 1;
   g.power.meter = g.power.max;
   api.press('power');
-  api.step(1.32);          // the front rank reaching the wolves, the rest still coming
+  api.step(2.2);           // the front rank reaching the wolves, the rest still coming
   g.onState(g.snapshot());
 });
 await page.screenshot({ path: join(out, '3-mama.png'), animations: 'disabled' });

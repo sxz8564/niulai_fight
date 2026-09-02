@@ -744,8 +744,19 @@ const cast = await api(() => {
   g.player.takeHit(30, -1);
   const tookDamage = g.player.health < hp;
 
-  globalThis.__niulaiFight.step(2.6);
-  const endX = p.herd.map((cow, i) => cow.actor.root.position.x - startX[i]);
+  /*
+   * Run it until the herd is gone rather than for a fixed time. How long a
+   * stampede takes is a tuning number in the registry — it has been halved once
+   * already — and a test that bakes in the old value fails the day someone
+   * changes it, which teaches people to distrust the suite rather than the
+   * change.
+   */
+  const moved = [];
+  for (let i = 0; i < 60 && p.herd.length; i++) {
+    globalThis.__niulaiFight.step(0.2);
+    p.herd.forEach((cow, j) => { moved[j] = cow.actor.root.position.x - startX[j]; });
+  }
+  const endX = moved;
   return {
     casting, herd, lanes, tookDamage,
     ranAllOneWay: endX.every((d) => d > 0),
@@ -827,7 +838,13 @@ const trampled = await api(() => {
   g.player.dead = false; g.player.blocking = false;
   const before = f.health;
   globalThis.__niulaiFight.press('power');
-  globalThis.__niulaiFight.step(4);
+  // One step first: the press is only consumed on the next update, so a loop
+  // that checks "is it casting yet" before that runs zero times and reports a
+  // super that did nothing.
+  globalThis.__niulaiFight.step(0.1);
+  for (let i = 0; i < 60 && (g.power.casting > 0 || g.power.herd.length); i++) {
+    globalThis.__niulaiFight.step(0.2);
+  }
   const damage = before - f.health;
   return { damage, cows: damage / (g.power.spec.damage || 18) };
 });
