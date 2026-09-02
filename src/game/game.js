@@ -49,6 +49,7 @@ export class Game {
     this.over = false;
     this.won = false;
     this.time = 0;
+    this.cheerTime = 0;
     this.spawnQueue = 0;
     this.spawnTimer = 0;
 
@@ -156,7 +157,10 @@ export class Game {
   update(dt) {
     dt = Math.min(dt, 1 / 20);   // a long stall must not teleport anyone
     this.time += dt;
-    if (this.over) return;
+    if (this.over) {
+      if (this.won) this.cheer(dt);
+      return;
+    }
 
     this.drivePlayer(dt);
     this.driveSpawns(dt);
@@ -378,6 +382,7 @@ export class Game {
       if (this.gateIndex >= this.gates.length) {
         this.over = true;
         this.won = true;
+        this.celebrate();
       }
       this.onState(this.snapshot());
     }
@@ -401,6 +406,63 @@ export class Game {
     this.bossSpec = spec;
     this.boss = new Boss(fighter, { min: gate.x - 15, max: gate.x + 4 });
     return this.boss;
+  }
+
+  /*
+   * The one moment in the game that is not a fight.
+   *
+   * Everything stops when `over` is set — which, for a loss, is right: the
+   * player is on the floor and the run is finished. For a win it left the hero
+   * standing perfectly still under a banner congratulating him, which is a
+   * strange way to end four minutes of work. So a win hands the frame over to
+   * `cheer()` instead of stopping it.
+   */
+  celebrate() {
+    const p = this.player;
+    p.velocity.set(0, 0, 0);
+    p.attackTimer = 0;
+    p.stunTimer = 0;
+    p.downTimer = 0;
+    p.blocking = false;
+    p.pose = null;
+    p.facing = 1;
+    // Side-on, the ordinary way the game is framed. A backflip seen head-on is
+    // a shape that gets smaller and larger again; the whole rotation only reads
+    // from the side.
+    p.actor.setFacing(1);
+    // A character with no celebration keeps its idle rather than freezing in
+    // whatever pose the last punch left it in.
+    p.actor.play(p.actor.has('win') ? 'win' : 'idle');
+    this.cheerTime = 0;
+  }
+
+  /** Runs the celebration: the hero, anything still crossing the field, and a
+   * camera that comes in to watch rather than staying at fighting distance. */
+  cheer(dt) {
+    this.cheerTime += dt;
+    // Cows already on their way keep going. Winning mid-stampede and having the
+    // herd blink out of existence would be a worse ending than either.
+    if (this.power) this.power.update(dt, this.player, this.enemies);
+    // Re-asserted rather than set once: a summon finishing during the
+    // celebration clears the pose it was holding.
+    this.player.actor.play(this.player.actor.has('win') ? 'win' : 'idle');
+    this.player.actor.update(dt, 0);
+
+    /*
+     * Come in and look at him properly. The look-at point is the centre of the
+     * picture, so aiming it at the hero's middle rather than at head height is
+     * what puts him in the middle of the frame instead of at the bottom of it —
+     * and the banner has moved to the top of the screen to leave him the room.
+     * High enough to clear the backflip, which takes him well off the ground.
+     */
+    const close = 6.4;
+    this.camera.position.z += (close - this.camera.position.z) * Math.min(1, dt * 1.1);
+    this.camera.position.y += (1.95 - this.camera.position.y) * Math.min(1, dt * 1.1);
+    this.camera.position.x += (this.player.position.x - this.camera.position.x) * Math.min(1, dt * 1.6);
+    this.camera.lookAt(this.player.position.x, 0.78, 0);
+    this.sun.position.set(this.camera.position.x + 6, 12, 8);
+    this.sun.target.position.set(this.camera.position.x, 0, 0);
+    this.input.endFrame();
   }
 
   loseLife() {
@@ -466,10 +528,14 @@ export class Game {
       lives: this.lives,
       score: this.score,
       enemies: this.enemies.length,
-      stage: this.gateIndex + 1,
+      // Clamped: clearing the last gate walks the index one past the end, which
+      // is how the game knows it is won — but "STAGE 6/5" on the winning screen
+      // reads as a bug to everyone who sees it.
+      stage: Math.min(this.gateIndex + 1, this.gates.length),
       stages: this.gates.length,
       over: this.over,
       won: this.won,
+      cheering: this.over && this.won,
       rage: this.power ? {
         name: this.power.spec.name,
         nameChinese: this.power.spec.nameChinese || '',

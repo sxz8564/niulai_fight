@@ -62,6 +62,9 @@ function paint(state) {
   }
   hud.hint.textContent = '← → move · ↑ ↓ step up and down · J punch · K kick · ' +
     'L hold to block' + (rage ? ` · M ${rage.name} when the bar is full` : '');
+  // The controls are no use once the run is over, and they sit directly under
+  // the banner.
+  hud.hint.hidden = Boolean(state.over);
 
   /*
    * The boss bar only exists while there is a boss. Its wind-up gets its own
@@ -91,6 +94,7 @@ function paint(state) {
     small.className = 'again';
     small.textContent = 'R  play again      ·      C  choose a fighter';
     hud.banner.append(big, small);
+    hud.banner.classList.toggle('won', Boolean(state.won));
     hud.banner.hidden = false;
   } else {
     hud.banner.hidden = true;

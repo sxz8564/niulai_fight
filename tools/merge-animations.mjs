@@ -51,6 +51,9 @@ const NAMING = [
   // Order matters throughout. These two go first because "Charged_Spell_Cast"
   // and "Bow_Charge" both contain words the later rules look for.
   { match: /Charged_Spell_Cast|Spell_Cast|Summon/i, name: 'summon' },
+  // Before the kick and jump rules: "Backflip_Sweep_Kick" contains both words
+  // and is neither.
+  { match: /Backflip|Victory|Celebrat|Cheer|Dance/i, name: 'win' },
   { match: /Bow_Charge|Charge_Left_Hand/i, name: 'charge' },
   { match: /Prep_Straight_Punch/i, name: 'punch' },
   { match: /Right_Straight_Kick/i, name: 'kick' },

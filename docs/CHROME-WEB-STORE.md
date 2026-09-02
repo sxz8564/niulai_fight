@@ -83,7 +83,7 @@ dashboard accepts.
 | Field | File | Size |
 | --- | --- | --- |
 | Store icon | `icon-128.png` | 128 x 128 |
-| Screenshots | `2-fight.png`, `3-mama.png`, `4-boss.png`, `1-select.png`, `5-again.png` | 1280 x 800 |
+| Screenshots | `2-fight.png`, `3-mama.png`, `4-boss.png`, `1-select.png`, `5-win.png` | 1280 x 800 |
 | Small promo tile | `promo-440x280.png` | 440 x 280 |
 | Marquee promo tile | `promo-1400x560.png` | 1400 x 560 |
 

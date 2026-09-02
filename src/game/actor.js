@@ -25,7 +25,7 @@ export const STATES = ['idle', 'walk', 'punch', 'kick', 'hit', 'down', 'block'];
  * incomplete character, so a list of "missing" clips that always includes
  * `summon` for everyone but Niulai would be noise rather than a gap.
  */
-export const OPTIONAL_STATES = ['summon'];
+export const OPTIONAL_STATES = ['summon', 'win'];
 
 /*
  * The states a prop understands. A vehicle has no rig and no clips, so its
@@ -310,6 +310,20 @@ export function createActor(spec, gltf) {
     for (const [state, fallback] of Object.entries(spec.fallbacks || {})) {
       if (!actions[state] && actions[fallback]) actions[state] = actions[fallback];
     }
+
+    /*
+     * Start the idle here rather than waiting to be asked for it.
+     *
+     * `state` below begins as 'idle', and `play()` returns early when asked for
+     * the state it is already in — so the game's first play('idle') was always
+     * a no-op and no action ever started. A character that had not yet done
+     * something else stood in its bind pose: not breathing, not swaying, just
+     * a mannequin. It went unnoticed for as long as it did because the player
+     * walks within a second of starting and the wolves walk on arrival, so
+     * almost everything asked for a *different* state before anyone looked at
+     * it. What does not is a character standing still at the end of a won run.
+     */
+    if (actions.idle) actions.idle.reset().setEffectiveWeight(1).play();
   } else {
     const mounted = mountHead(gltf.scene, spec);
     holder = mounted.holder;
@@ -368,6 +382,13 @@ export function createActor(spec, gltf) {
 
     /** States the model had no clip for — reported so a gap is visible. */
     get missingClips() { return missing; },
+
+    /*
+     * Whether this actor can play a state at all. The optional ones are the
+     * point: asking for a celebration a character does not have would leave it
+     * frozen in whatever it was doing, which is worse than not celebrating.
+     */
+    has(state) { return Boolean(actions && actions[state]); },
 
     /*
      * A visible flinch that does not change state. An armoured fighter never

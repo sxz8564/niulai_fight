@@ -80,6 +80,30 @@ fills and does nothing is a worse promise than no bar. It is a registry entry:
 give a character a `power` block and the bar, the key and the pad button all
 appear.
 
+## Winning
+
+Clear the fifth stage and the game stops being a fight. Niulai plants himself
+and goes into a sweep kick and a backflip, on a loop, while the camera leaves
+its fighting distance and comes in to watch — and the banner moves to the top of
+the screen so the words are not standing on top of him.
+
+![Niulai mid-backflip under the winning banner](docs/win.png)
+
+It is the same `play()` every other state goes through, so the celebration is a
+clip name in the registry and nothing more. **Baola has no celebration clip**,
+and rather than freezing her in whatever the last thing she did left her in, she
+falls back to her idle: `actor.has(state)` is what decides, and dropping the same
+clip into her registry entry is all it would take to give her one.
+
+Finding that out turned up a real bug, and an old one. `state` starts as `idle`
+and `play()` returns early for the state it is already in — so the game's first
+`play('idle')` was always a no-op and **no action ever started**. A character
+that had not yet done something else stood in its bind pose: not breathing, not
+swaying, a mannequin. Nothing caught it for as long as it existed because the
+player walks within a second of starting and the wolves walk on arrival, so
+almost everything asked for a *different* state before anyone looked at it. What
+does not is a character standing still at the end of a won run.
+
 ## The Cart
 
 The fifth stage is not more wolves. **The Cart 木车** rolls in with two of them,
@@ -212,6 +236,12 @@ the same way, that nothing can touch him mid-summon, that a screen of wolves
 does not survive it, that several of them land on the Cart at once because it is
 wide enough for that, that the herd clears itself off the field, that the shout
 is in a format the browser can decode — and that Baola has none of it.
+
+The ending has checks of its own: that clearing the last gate plays the
+celebration rather than stopping the frame, that the bones are still moving
+afterwards, that the camera comes in, that the banner gets out of the way — and,
+in the one place that can ask it, that a brand-new character animates before
+anyone has asked it to do anything.
 
 The boss gets its own set, and each one is the same question from a different
 side — is its one attack answerable? That it pauses before it charges and does

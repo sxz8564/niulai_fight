@@ -880,6 +880,39 @@ const second = await page.evaluate(async () => {
   await baola.load();
   const missing = baola.player.actor.missingClips;
   const snap = baola.snapshot();
+
+  /*
+   * A brand-new character, asked for nothing yet, has to be animating.
+   *
+   * This is the one place that can ask. `state` starts as 'idle' and `play()`
+   * returns early for the state it is already in, so the game's first
+   * play('idle') was a no-op and no action ever started: a character that had
+   * not yet done something else stood in its bind pose. Nothing caught it
+   * because the player walks within a second of starting and the wolves walk on
+   * arrival — everything asked for a *different* state before anyone looked.
+   * What does not is a character standing still at the end of a won run.
+   */
+  const Vec = Object.getPrototypeOf(baola.camera.position).constructor;
+  const bones = [];
+  baola.player.actor.root.traverse((node) => { if (node.isBone) bones.push(node); });
+  const sample = () => bones.map((bone) => bone.getWorldPosition(new Vec()).y);
+  const moved = (a, b) => a.filter((v, i) => Math.abs(v - b[i]) > 1e-4).length;
+
+  const atRest = sample();
+  for (let i = 0; i < 24; i++) baola.update(1 / 60);
+  const breathing = moved(atRest, sample());
+
+  // And her ending: she has no celebration clip, so she must fall back to the
+  // idle rather than freeze in whatever the last thing she did left her in.
+  for (const gate of baola.gates) gate.opened = true;
+  baola.gateIndex = baola.gates.length - 1;
+  baola.player.position.set(baola.gates[baola.gateIndex].x - 3, 0, 0.2);
+  for (let i = 0; i < 12; i++) baola.update(1 / 60);
+  const endState = baola.player.actor.state;
+  const stood = sample();
+  for (let i = 0; i < 30; i++) baola.update(1 / 60);
+  const stillMoving = moved(stood, sample());
+
   return {
     name: snap.playerName,
     chinese: snap.playerNameChinese,
@@ -887,7 +920,13 @@ const second = await page.evaluate(async () => {
     speed: baola.player.speed,
     power: baola.power,
     rage: snap.rage,
-    missing
+    missing,
+    bones: bones.length,
+    breathing,
+    hasWin: baola.player.actor.has('win'),
+    won: baola.won,
+    endState,
+    stillMoving
   };
 });
 check('Baola loads as a second hero', second.name === 'Baola', `${second.name} ${second.chinese}`);
@@ -900,6 +939,63 @@ check('the two heroes are not identical', second.speed !== 4.1 || second.health 
  * check that it does. */
 check('Baola has no rage meter, because her super is not designed yet',
   second.power === null && second.rage === null);
+check('a character animates before it is asked to do anything',
+  second.breathing > 0, `${second.breathing} of ${second.bones} bones moving on an untouched idle`);
+check('a fighter with no celebration falls back to its idle rather than freezing',
+  second.won && !second.hasWin && second.endState === 'idle' && second.stillMoving > 0,
+  `${second.endState}, ${second.stillMoving} bones moving`);
+
+
+/* ------------------------------------------------------------ the ending --
+ *
+ * Winning used to stop the frame. That is right for a loss — the player is on
+ * the floor and the run is finished — but it left a won run as a hero standing
+ * perfectly still under a banner congratulating him.
+ */
+const ending = await api(() => {
+  const g = globalThis.__niulaiFight.game;
+  const Vec = Object.getPrototypeOf(g.camera.position).constructor;
+  const bones = [];
+  g.player.actor.root.traverse((node) => { if (node.isBone) bones.push(node); });
+  const sample = () => bones.map((bone) => bone.getWorldPosition(new Vec()).y);
+  const moved = (a, b) => a.filter((v, i) => Math.abs(v - b[i]) > 1e-4).length;
+
+  // Clear the last gate for real rather than setting `over` by hand, so this
+  // measures the path the game actually takes to its ending.
+  for (const gate of g.gates) gate.opened = true;
+  g.gateIndex = g.gates.length - 1;
+  g.player.position.set(g.gates[g.gateIndex].x - 3, 0, 0.2);
+  for (const enemy of g.enemies) g.scene.remove(enemy.root);
+  g.enemies = []; g.boss = null; g.spawnQueue = 0;
+  g.power.clear();
+  g.player.health = g.player.maxHealth;
+  g.player.dead = false; g.player.downTimer = 0; g.player.stunTimer = 0;
+  g.player.attackTimer = 0;
+  globalThis.__niulaiFight.step(0.2);
+
+  const snap = g.snapshot();
+  const farAway = g.camera.position.z;
+  const before = sample();
+  globalThis.__niulaiFight.step(0.5);
+  const movingAfterTheWin = moved(before, sample());
+  globalThis.__niulaiFight.step(2.5);
+  return {
+    won: snap.won, cheering: snap.cheering,
+    state: g.player.actor.state,
+    has: g.player.actor.has('win'),
+    farAway, closeUp: g.camera.position.z,
+    movingAfterTheWin, bones: bones.length
+  };
+});
+check('winning the last stage plays the celebration',
+  ending.won && ending.has && ending.state === 'win', `${ending.state}`);
+check('and the frame keeps running so it can be seen',
+  ending.movingAfterTheWin > 0, `${ending.movingAfterTheWin} of ${ending.bones} bones moving`);
+check('the camera comes in to watch it', ending.closeUp < ending.farAway - 1,
+  `${ending.farAway.toFixed(1)} -> ${ending.closeUp.toFixed(1)}`);
+check('the banner moves off the hero when the news is good',
+  await page.evaluate(() => document.getElementById('banner').classList.contains('won')));
+await page.screenshot({ path: join(shots, '5-win.png'), animations: 'disabled' });
 
 /*
  * Restarting. The interesting part is not that a new game appears — it is that

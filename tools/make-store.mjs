@@ -153,19 +153,29 @@ const plate = await page.evaluate(() => {
   return document.getElementById('view').toDataURL('image/png');
 });
 
-// The end of a run, showing that it offers another one.
+/*
+ * The ending. Cleared for real rather than by setting `over` by hand, because
+ * the celebration only starts on the path the game actually takes to its ending
+ * — and the celebration is the shot.
+ */
 await page.evaluate(() => {
   const api = globalThis.__niulaiFight;
   const g = api.game;
   document.getElementById('hud').style.visibility = '';
   g.score = 12400;
-  g.over = true;
-  g.won = true;
+  for (const enemy of g.enemies) g.scene.remove(enemy.root);
+  g.enemies = [];
+  g.boss = null;
+  g.spawnQueue = 0;
+  g.power.clear();
+  g.player.health = g.player.maxHealth;
+  g.player.dead = false; g.player.downTimer = 0; g.player.stunTimer = 0;
+  api.step(0.2);      // the last gate clears; he starts celebrating
+  api.step(3.0);      // the apex of the flip: limbs out, silhouette unmistakable
   g.onState(g.snapshot());
-  api.step(0.05);
 });
-await page.screenshot({ path: join(out, '5-again.png') });
-console.log('5-again.png');
+await page.screenshot({ path: join(out, '5-win.png'), animations: 'disabled' });
+console.log('5-win.png');
 await page.close();
 
 /* ------------------------------------------------------- tiles and icons */

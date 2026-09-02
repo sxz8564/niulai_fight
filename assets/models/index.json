@@ -54,6 +54,10 @@
         "clip": "summon",
         "from": 1.6,
         "to": 2.6
+      },
+      "win": {
+        "clip": "win",
+        "loop": true
       }
     },
     "timings": {
@@ -61,7 +65,8 @@
       "kick": 0.38,
       "hit": 0.34,
       "down": 1.25,
-      "summon": 1.0
+      "summon": 1.0,
+      "win": 4.0
     },
     "_spares": "hurdle, backjump and jump are merged and trimmed but not bound to anything: jumping needs an air state first. knee is an obvious heavy attack whenever a third button is wanted.",
     "playable": true,
