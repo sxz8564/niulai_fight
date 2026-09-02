@@ -243,6 +243,52 @@ const depth = await api(() => {
 check('a punch lands when level on the belt', depth.levelHit);
 check('and misses someone standing further up it', !depth.apartHit);
 
+/*
+ * Every wolf on the field must have a body of its own.
+ *
+ * The bug this exists for: all actors of one kind were handed the same
+ * gltf.scene, and a three.js object has one parent — so spawning the second
+ * wolf took the mesh out of the first. That wolf went invisible while
+ * remaining a Fighter: it still blocked the player and still landed punches.
+ * A phantom, reported by a player and invisible to every other check here,
+ * because nothing else asks whether a thing that can hit you can be seen.
+ */
+const bodies = await api(() => {
+  const g = globalThis.__niulaiFight.game;
+  // Enough wolves at once that a shared model would show.
+  while (g.enemies.length < 3) {
+    g.spawnQueue = 3 - g.enemies.length;
+    g.spawnTimer = 0;
+    globalThis.__niulaiFight.step(2);
+  }
+
+  const meshes = [];
+  let withoutABody = 0;
+  for (const wolf of g.enemies) {
+    let found = null;
+    wolf.root.traverse((node) => { if (node.isSkinnedMesh || node.isMesh) found = found || node; });
+    if (!found) withoutABody++;
+    else meshes.push(found.uuid);
+  }
+  return {
+    wolves: g.enemies.length,
+    withoutABody,
+    distinct: new Set(meshes).size,
+    // A shared skeleton would make every copy animate as one.
+    distinctSkeletons: new Set(g.enemies.map((wolf) => {
+      let skeleton = null;
+      wolf.root.traverse((node) => { if (node.isSkinnedMesh) skeleton = skeleton || node.skeleton; });
+      return skeleton ? skeleton.uuid : 'none';
+    })).size
+  };
+});
+check('every wolf has a body', bodies.withoutABody === 0,
+  `${bodies.wolves} wolves, ${bodies.withoutABody} invisible`);
+check('no two wolves share one mesh', bodies.distinct === bodies.wolves,
+  `${bodies.distinct} meshes for ${bodies.wolves} wolves`);
+check('no two wolves share one skeleton', bodies.distinctSkeletons === bodies.wolves,
+  `${bodies.distinctSkeletons} skeletons for ${bodies.wolves} wolves`);
+
 /* Blocking. The point of it is the asymmetry: it works against what you are
  * facing and not against what you are not, so both halves are checked. */
 const blocked = await api(() => {

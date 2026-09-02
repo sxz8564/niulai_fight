@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
 
 /*
  * An actor is a head plus a body.
@@ -115,7 +116,21 @@ export function createActor(spec, gltf) {
      * with about half a second of punch in the middle of it. So each state
      * names a clip and, optionally, the slice of it worth playing.
      */
-    const model = gltf.scene;
+    /*
+     * Every actor gets its own copy of the model.
+     *
+     * Handing out `gltf.scene` itself looks like it works right up until a
+     * second character of the same kind spawns: a three.js object has one
+     * parent, so adding the shared model to the new actor takes it out of the
+     * old one. The first wolf becomes an empty group — invisible, but still a
+     * Fighter with a position, so it still blocks the player and still throws
+     * punches. A phantom.
+     *
+     * SkeletonUtils.clone rather than Object3D.clone: a plain clone copies the
+     * skinned meshes but leaves them bound to the original's skeleton, so
+     * every copy would animate identically to whichever one moved last.
+     */
+    const model = cloneSkinned(gltf.scene);
     if (spec.scale) model.scale.setScalar(spec.scale);
     // Without this the rigged character is the one thing on the field with no
     // shadow, which reads as floating even when it is standing on the ground.
