@@ -66,6 +66,20 @@ Niulai's call to his mother, and the noise Baola's change makes. Both are
 `shout` in the registry's `power` block, played the moment the meter is spent,
 and `shoutVolume` pulls one back if it sits too loud against the rest.
 
+Each fighter also has a **voice** — an effort on the swing and a cry on going
+down — under `voice` in their registry entry. The effort is on the swing rather
+than on contact, unlike the impacts: it is the effort, and it happens whether or
+not anything is there to hit. The cry goes with the fall rather than with the
+life being deducted, which is a second and a quarter later as they are already
+getting back up.
+
+The bank is shared and deliberately last-writer-wins, because rounds are
+sequential: starting a round registers that fighter's voice under `voice:attack`
+and `voice:down`, replacing whoever was there, and no call site has to ask who
+is being played. The one place that builds a second game *beside* the first
+rather than after it is the test suite, which borrows the voice and hands it
+back.
+
 **Punches and kicks are the player's only.** The wolves throwing the same sound
 back would turn a crowd into noise, and the point of these is that a player can
 hear their own hits land without watching the health bars. They fire on contact

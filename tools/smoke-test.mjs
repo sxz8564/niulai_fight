@@ -979,8 +979,24 @@ const second = await page.evaluate(async () => {
     ? {} : { Game: globalThis.__niulaiFight.game.constructor };
   const canvas = document.createElement('canvas');
   canvas.width = 320; canvas.height = 180;
+  /*
+   * The sound bank is shared and deliberately last-writer-wins: rounds are
+   * sequential, so registering the new fighter's voice over the old one is the
+   * whole point. This block is the one place that builds a second Game *beside*
+   * the first rather than after it, so it borrows the voice and has to give it
+   * back — otherwise every later check runs with her grunt in his mouth.
+   */
+  const borrowed = ['voice:attack', 'voice:down']
+    .map((key) => [key, globalThis.__niulaiFight.sounds.bank.get(key)]);
+
   const baola = new Game(canvas, { playerId: 'baola' });
   await baola.load();
+  // Read at the moment she registers it, not at the end — by then it has been
+  // handed back.
+  const herVoice = ['voice:attack', 'voice:down'].map((key) => {
+    const entry = baola.sounds.bank.get(key);
+    return entry ? entry.voices[0].src.split('/').pop() : null;
+  });
   const missing = baola.player.actor.missingClips;
   const snap = baola.snapshot();
 
@@ -1200,12 +1216,17 @@ const second = await page.evaluate(async () => {
   for (let i = 0; i < 30; i++) baola.update(1 / 60);
   const stillMoving = moved(stood, sample());
 
+  for (const [key, entry] of borrowed) {
+    if (entry) globalThis.__niulaiFight.sounds.bank.set(key, entry);
+  }
+
   return {
     name: snap.playerName,
     chinese: snap.playerNameChinese,
     health: snap.maxHealth,
     speed: baola.player.speed,
     kind: baola.power && baola.power.kind,
+    voices: herVoice,
     rage: snap.rage,
     missing,
     ordinaryPunch, superPunch, afterPunch,
@@ -1230,6 +1251,8 @@ check('the two heroes are not identical', second.speed !== 4.1 || second.health 
  * numbers. The registry is what decides which one a character gets, so the
  * first of these is really a check that it does.
  */
+check('choosing her swaps the voice, rather than leaving his in place',
+  second.voices.every((file) => file && file.startsWith('baola-')), second.voices.join(', '));
 check('Baola has a meter too, and it buys a different move',
   second.kind === 'transform' && second.rage !== null, `kind: ${second.kind}`);
 check('her change has a sound, and it is one the browser can decode',
@@ -1377,14 +1400,101 @@ const heard = await api(() => {
   return { punching, kicking, beingHit, hurtBefore, knockdown };
 });
 check('the player\'s punch landing makes a punch',
-  heard.punching.join() === 'punch', heard.punching.join(', ') || 'silence');
+  heard.punching.includes('punch') && !heard.punching.includes('kick'),
+  heard.punching.join(', ') || 'silence');
 check('and their kick makes a kick',
-  heard.kicking.join() === 'kick', heard.kicking.join(', ') || 'silence');
+  heard.kicking.includes('kick') && !heard.kicking.includes('punch'),
+  heard.kicking.join(', ') || 'silence');
 check('a wolf hitting the player makes neither',
   heard.hurtBefore && heard.beingHit.length === 0,
   heard.beingHit.join(', ') || 'silence, and the player was hit');
 check('a body going down thuds', heard.knockdown.includes('fall'),
   heard.knockdown.join(', ') || 'silence');
+
+/*
+ * The fighter's own voice: an effort on the swing, and a cry on going down.
+ *
+ * The effort is on the swing rather than on contact, unlike the impacts — it is
+ * the effort, and it happens whether or not anything is there to hit. The cry
+ * goes with the fall rather than with the life being deducted, which is a
+ * second and a quarter later as they are already getting back up.
+ */
+const spoke = await api(async () => {
+  const g = globalThis.__niulaiFight.game;
+  const api2 = globalThis.__niulaiFight;
+
+  const loaded = {};
+  for (const key of ['voice:attack', 'voice:down']) {
+    const entry = g.sounds.bank.get(key);
+    const audio = entry && entry.voices[0];
+    if (!audio) { loaded[key] = null; continue; }
+    await new Promise((resolve) => {
+      if (audio.readyState >= 1) return resolve();
+      audio.addEventListener('loadedmetadata', resolve, { once: true });
+      audio.addEventListener('error', resolve, { once: true });
+      setTimeout(resolve, 5000);
+    });
+    loaded[key] = {
+      file: audio.src.split('/').pop(),
+      seconds: audio.duration,
+      error: audio.error ? audio.error.code : null
+    };
+  }
+
+  const log = [];
+  const real = g.sounds.play.bind(g.sounds);
+  g.sounds.play = (name) => { log.push(name); return true; };
+  const take = () => { const copy = log.slice(); log.length = 0; return copy; };
+  const p = g.player;
+  const ready = () => {
+    p.health = p.maxHealth; p.dead = false; p.downTimer = 0; p.stunTimer = 0;
+    p.attackTimer = 0; p.invulnerable = 0; p.blocking = false; p.facing = 1;
+    g.buffered = null;
+    log.length = 0;
+  };
+
+  ready(); api2.press('punch'); api2.step(0.1);
+  const swinging = take();
+  ready(); api2.press('kick'); api2.step(0.1);
+  const kicking = take();
+  // A press that cannot become a swing must stay quiet.
+  ready(); p.attackTimer = 0.4; api2.press('punch'); api2.step(0.05);
+  const whileBusy = take();
+
+  ready(); p.takeHit(999, -1);
+  const goingDown = take();
+
+  // And a wolf going down must not borrow the hero's voice.
+  globalThis.__wolves(1);
+  const wolf = g.enemies[0];
+  take();
+  wolf.invulnerable = 0;
+  wolf.takeHit(999, -1);
+  const wolfDown = take();
+
+  g.sounds.play = real;
+  for (const enemy of g.enemies) g.scene.remove(enemy.root);
+  g.enemies = [];
+  ready();
+  return { loaded, swinging, kicking, whileBusy, goingDown, wolfDown };
+});
+const missing = Object.entries(spoke.loaded)
+  .filter(([, v]) => !v || v.error !== null || !(v.seconds > 0)).map(([k]) => k);
+check('the fighter has a voice, and it is one the browser can decode',
+  missing.length === 0,
+  missing.length ? `cannot decode: ${missing.join(', ')}`
+    : Object.values(spoke.loaded).map((v) => `${v.file} ${v.seconds.toFixed(2)}s`).join(', '));
+check('they make an effort when they swing, punch or kick',
+  spoke.swinging.includes('voice:attack') && spoke.kicking.includes('voice:attack'),
+  `${spoke.swinging.join(', ') || 'silence'} / ${spoke.kicking.join(', ') || 'silence'}`);
+check('and not on a press that never becomes a swing',
+  spoke.whileBusy.length === 0, spoke.whileBusy.join(', ') || 'silence');
+check('they cry out as they go down, with the thud',
+  spoke.goingDown.includes('voice:down') && spoke.goingDown.includes('fall'),
+  spoke.goingDown.join(', ') || 'silence');
+check('a wolf going down does not borrow it',
+  spoke.wolfDown.includes('fall') && !spoke.wolfDown.includes('voice:down'),
+  spoke.wolfDown.join(', ') || 'silence');
 
 /*
  * And the three that are about the shape of a run rather than a hit: the Cart

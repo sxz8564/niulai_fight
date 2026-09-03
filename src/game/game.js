@@ -119,6 +119,20 @@ export class Game {
      * the other's is not, rather than a bar that fills and does nothing.
      */
     if (hero.power) this.power = new Power(hero.power, this);
+
+    /*
+     * The chosen fighter's own voice, under names that do not mention them.
+     * The bank outlives a round, so registering Baola's grunt as `voice:attack`
+     * replaces Niulai's rather than sitting beside it, and the call sites never
+     * have to ask who is being played.
+     */
+    const voice = hero.voice || {};
+    if (voice.attack) {
+      this.sounds.add('voice:attack', { file: voice.attack, volume: voice.volume ?? 0.8 });
+    }
+    if (voice.down) {
+      this.sounds.add('voice:down', { file: voice.down, volume: voice.volume ?? 0.8, voices: 1 });
+    }
     this.onState(this.snapshot());
     return this;
   }
@@ -144,7 +158,12 @@ export class Game {
     this.scene.add(actor.root);
     const fighter = new Fighter(actor, {
       ...(spec.body || {}), ...stats, facing: stats.facing ?? 1, timings: spec.timings,
-      onDown: () => this.sounds.play('fall')
+      onDown: (who) => {
+        this.sounds.play('fall');
+        // The cry belongs with the fall, not with the life being deducted a
+        // second and a quarter later as they are getting back up.
+        if (who === this.player) this.sounds.play('voice:down');
+      }
     });
     actor.setFacing(fighter.facing);
     return fighter;
@@ -251,7 +270,9 @@ export class Game {
     if (this.buffered) {
       const kind = this.buffered.kind;
       this.buffered = null;
-      p.attack(kind);
+      // On the swing, unlike the impact sounds, which wait for contact: this is
+      // the effort, and it happens whether or not anything is there to hit.
+      if (p.attack(kind)) this.sounds.play('voice:attack');
       return;
     }
 

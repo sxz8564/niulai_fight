@@ -96,6 +96,12 @@
       "gallopAt": 15,
       "range": 30,
       "kind": "summon"
+    },
+    "voice": {
+      "attack": "niulai-attack.webm",
+      "down": "niulai-down.webm",
+      "volume": 0.8,
+      "_comment": "Bare filenames under assets/audio/, the same shape the sound bank's own manifest uses."
     }
   },
   {
@@ -181,6 +187,11 @@
       "shrink": 0.3,
       "shout": "audio/power.webm",
       "shoutVolume": 0.8
+    },
+    "voice": {
+      "attack": "baola-attack.webm",
+      "down": "baola-down.webm",
+      "volume": 0.8
     }
   },
   {

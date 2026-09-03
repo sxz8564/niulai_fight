@@ -40,23 +40,37 @@ export class Sounds {
         if (typeof Audio === 'undefined') return this;
         for (const [name, entry] of Object.entries(manifest)) {
           const config = typeof entry === 'string' ? { file: entry } : entry;
-          // A looping track is one element that keeps its place. Giving it
-          // voices would mean the music restarting on top of itself.
-          const count = config.loop ? 1 : (config.voices || DEFAULT_VOICES);
-          const voices = [];
-          for (let i = 0; i < count; i++) {
-            const audio = new Audio(`${this.base}audio/${config.file}`);
-            audio.preload = 'auto';
-            audio.volume = config.volume ?? DEFAULT_VOLUME;
-            audio.loop = Boolean(config.loop);
-            voices.push(audio);
-          }
-          this.bank.set(name, { voices, next: 0, loop: Boolean(config.loop) });
+          this.add(name, config);
         }
         return this;
       })
       .catch(() => this);   // a game with no sound is still a game
     return this.loading;
+  }
+
+  /**
+   * Puts one sound in the bank, replacing whatever was under that name.
+   *
+   * Used by the manifest above and, at the start of a round, for the sounds
+   * that belong to whoever is being played — the same name means the current
+   * hero's voice, so switching fighters replaces it rather than accumulating.
+   */
+  add(name, entry) {
+    if (typeof Audio === 'undefined') return this;
+    const config = typeof entry === 'string' ? { file: entry } : entry;
+    // A looping track is one element that keeps its place. Giving it voices
+    // would mean the music restarting on top of itself.
+    const count = config.loop ? 1 : (config.voices || DEFAULT_VOICES);
+    const voices = [];
+    for (let i = 0; i < count; i++) {
+      const audio = new Audio(`${this.base}audio/${config.file}`);
+      audio.preload = 'auto';
+      audio.volume = config.volume ?? DEFAULT_VOLUME;
+      audio.loop = Boolean(config.loop);
+      voices.push(audio);
+    }
+    this.bank.set(name, { voices, next: 0, loop: Boolean(config.loop) });
+    return this;
   }
 
   /** @returns {boolean} whether a voice was actually started. */
