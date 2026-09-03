@@ -508,6 +508,67 @@ check('the charge holds its lane', line.phase === 'charge' && line.drift < 0.02,
 check('the charge is much faster than it rolls', line.chargeSpeed > line.stalkSpeed * 3,
   `${line.chargeSpeed.toFixed(1)} vs ${line.stalkSpeed.toFixed(1)} units/s`);
 
+/*
+ * And it can do it anywhere the player can stand.
+ *
+ * The Cart's arena — the thing that ends a charge when it runs out of room —
+ * used to be a window fifteen units either side of the last gate, while the
+ * player is free to walk the whole level. Retreat past the left edge of that
+ * window and every charge hit the "wall" on its first frame and went straight
+ * to recovery: the Cart followed you around for ever and could not touch you.
+ * The two of them get the same box now, and this is the check that says so.
+ */
+const reach = await api(() => {
+  const g = globalThis.__niulaiFight.game;
+  const boss = globalThis.__toBoss();
+  const f = boss.fighter;
+
+  // Where the player can actually get to, asked rather than assumed.
+  g.player.position.set(-999, 0, 0.2);
+  globalThis.__niulaiFight.step(1 / 60);
+  const playerCanReach = g.player.position.x;
+
+  const chargeAt = (where) => {
+    g.player.position.set(where, 0, 0.2);
+    g.player.health = g.player.maxHealth;
+    g.player.dead = false; g.player.downTimer = 0; g.player.stunTimer = 0;
+    g.player.attackTimer = 0; g.player.invulnerable = 0; g.player.blocking = false;
+    f.position.set(where + 3.4, 0, 0.2);
+    f.health = f.maxHealth;
+    boss.enter('wind');
+    globalThis.__niulaiFight.step(1.05);
+    globalThis.__niulaiFight.step(0.5);
+    return { where, cost: g.player.maxHealth - g.player.health };
+  };
+
+  const gate = g.gates[g.gateIndex];
+  const tries = [gate.x - 5, 40, 0, playerCanReach].map(chargeAt);
+
+  /*
+   * Put the fight back where it was found. This check deliberately drags it to
+   * the far end of the level, and the checks after it are about the Cart rather
+   * than about where the Cart is — leaving them standing at the left wall makes
+   * them depend on this one, which is how a single change ends up failing five
+   * things and none of the messages say why.
+   */
+  g.player.position.set(gate.x - 5, 0, 0.2);
+  g.player.health = g.player.maxHealth;
+  g.player.dead = false; g.player.downTimer = 0; g.player.stunTimer = 0;
+  g.player.attackTimer = 0; g.player.invulnerable = 0; g.player.blocking = false;
+  f.position.set(gate.x - 1.5, 0, 0.2);
+  f.health = f.maxHealth;
+  boss.enter('stalk');
+
+  return { arena: { ...boss.arena }, playerCanReach, boundary: gate.x, tries };
+});
+check('the boss is held to the same box as the player',
+  reach.arena.min <= reach.playerCanReach && reach.arena.max >= reach.boundary,
+  `boss [${reach.arena.min}, ${reach.arena.max}] against a player who reaches ` +
+  `[${reach.playerCanReach}, ${reach.boundary}]`);
+check('and can land its charge anywhere in it',
+  reach.tries.every((attempt) => attempt.cost > 20),
+  reach.tries.map((attempt) => `x=${attempt.where}: ${attempt.cost.toFixed(0)}`).join(', '));
+
 /* Standing in the way must hurt, and hurt properly — a boss whose attack costs
  * what a wolf's does is a wolf. */
 const ran = await api(() => globalThis.__oneCharge({ lane: 0 }));

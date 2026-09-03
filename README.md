@@ -268,6 +268,14 @@ It does not flinch. A punch hurts it without stopping it, because a boss a jab
 could halt would make the whole thing a matter of mashing one button and never
 moving.
 
+**It is held to exactly the box the player is held to**, and that is a fairness
+rule rather than a detail. Its arena is what ends a charge that has run out of
+room; when the arena was a window around the last gate instead of the level, a
+player who retreated past the left edge of that window made every charge hit the
+"wall" on its first frame and go straight to recovery. The Cart would follow
+them around the level for ever and could never touch them — a fight that looked
+like it was happening and was not.
+
 ## Installing it
 
 Clone it, then in Chrome: **chrome://extensions** → turn on **Developer mode**

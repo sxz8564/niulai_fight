@@ -10,6 +10,7 @@ import * as THREE from 'three';
 
 export const BELT_NEAR = 1.6;   // toward the camera
 export const BELT_FAR = -1.4;   // away from it
+export const STAGE_START = -4;  // where the level begins
 export const STAGE_END = 86;    // where the level stops
 
 const TREE_COLORS = ['#3f6d3a', '#4b7a3f', '#356034', '#5b8a45'];
@@ -127,5 +128,5 @@ export function buildStage(scene, textures) {
 /** Keeps an actor on the belt and inside the level. */
 export function clampToBelt(position) {
   position.z = Math.min(BELT_NEAR, Math.max(BELT_FAR, position.z));
-  position.x = Math.max(-4, Math.min(STAGE_END, position.x));
+  position.x = Math.max(STAGE_START, Math.min(STAGE_END, position.x));
 }

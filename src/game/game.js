@@ -5,7 +5,7 @@ import { Fighter, separate } from './fighter.js';
 import { Boss } from './boss.js';
 import { Power } from './power.js';
 import { soundBank } from './sound.js';
-import { buildStage, clampToBelt, BELT_NEAR, BELT_FAR, STAGE_END } from './stage.js';
+import { buildStage, clampToBelt, BELT_NEAR, BELT_FAR, STAGE_START, STAGE_END } from './stage.js';
 import { createInput } from './input.js';
 
 /*
@@ -429,7 +429,18 @@ export class Game {
      * than one you have to be looking at — the whole point of the second is
      * that it reaches a player who is busy with a wolf.
      */
-    this.boss = new Boss(fighter, { min: gate.x - 15, max: gate.x + 4 }, (phase) => {
+    /*
+     * The same box the player lives in, which is the only fair answer.
+     *
+     * It used to be a window around the gate — fifteen units left of it — and
+     * the arena is what ends a charge. So the moment the fight drifted further
+     * left than that, every charge hit the "wall" on its first frame and went
+     * straight to recovery: the Cart followed the player around the level for
+     * ever and could not touch them. Reported as the boss not being able to
+     * reach you, and it was worse than that, because it could reach you and
+     * still had no attack.
+     */
+    this.boss = new Boss(fighter, { min: STAGE_START, max: gate.x }, (phase) => {
       if (phase === 'wind') this.sounds.play('charge');
     });
     return this.boss;
