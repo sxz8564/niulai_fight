@@ -63,6 +63,25 @@ page.on('requestfailed', (r) => {
 await page.goto(url, { waitUntil: 'load' });
 // The select screen comes first now, so the harness picks for itself.
 await page.waitForFunction(() => globalThis.__niulaiFight, null, { timeout: 60000 });
+/*
+ * The roster listens on the window for Enter and for digits, and the difficulty
+ * row is on the same screen. A player tabbing to HARD and pressing it must get
+ * HARD, not a round of the game they had not chosen a fighter for yet.
+ */
+await page.focus('#levels button[data-level="normal"]');
+await page.keyboard.press('Enter');
+await page.focus('#levels button[data-level="hard"]');
+await page.keyboard.press('1');
+await page.waitForTimeout(150);
+const stillChoosing = await page.evaluate(() => ({
+  onTheRoster: !document.getElementById('select').hidden,
+  setting: globalThis.__niulaiFight.difficulty
+}));
+check('the difficulty row keeps its own keystrokes',
+  stillChoosing.onTheRoster && stillChoosing.setting === 'normal',
+  `${stillChoosing.setting}, ${stillChoosing.onTheRoster ? 'still choosing' : 'the game started'}`);
+await page.evaluate(() => globalThis.__niulaiFight.setDifficulty('easy'));
+
 await page.evaluate(() => globalThis.__niulaiFight.choose('niulai'));
 await page.waitForFunction(() => globalThis.__niulaiFight.game, null, { timeout: 60000 });
 
@@ -1843,6 +1862,94 @@ check('restarting keeps the fighter you chose', afterRestart.player === 'niulai'
   afterRestart.player);
 check('the banner is gone once play resumes',
   await page.evaluate(() => document.getElementById('banner').hidden));
+
+/* -------------------------------------------------------- three difficulties --
+ *
+ * Two knobs and no more: what a wolf can take, and how many gates stand between
+ * the start and the Cart. Easy has to be the game exactly as it shipped, since
+ * that is the one everybody who has already played it knows.
+ */
+const table = await api(async () => {
+  const module = await import('/src/game/difficulty.js');
+  return module.DIFFICULTIES.map((level) => {
+    const gates = module.gatesFor(level);
+    return {
+      id: level.id, health: level.wolf.health, boss: level.boss,
+      stages: gates.length, endsOnTheCart: gates[gates.length - 1].boss === 'cart',
+      xs: gates.map((gate) => gate.x)
+    };
+  });
+});
+const [easy, normal, hard] = table;
+check('there are three difficulties', table.map((l) => l.id).join(', ') === 'easy, normal, hard',
+  table.map((l) => l.id).join(', '));
+check('Easy is the level the game shipped with',
+  easy.stages === 5 && easy.health === 34 && easy.xs.join() === '10,26,44,62,80' &&
+  easy.boss === 1, `${easy.stages} stages, ${easy.health} hp wolves`);
+check('the harder ones are longer', normal.stages > easy.stages && hard.stages > normal.stages,
+  table.map((l) => `${l.id} ${l.stages}`).join(', '));
+check('and their wolves take more hits',
+  normal.health > easy.health && hard.health > normal.health,
+  table.map((l) => `${l.id} ${l.health}`).join(', '));
+/* The extra stages are added before the Cart, not spliced into the opening: the
+ * first fights of a hard run are the first fights of an easy one. */
+check('every difficulty opens the same way and ends on the Cart',
+  normal.xs.join().startsWith(easy.xs.slice(0, -1).join()) &&
+  hard.xs.join().startsWith(normal.xs.slice(0, -1).join()) &&
+  table.every((l) => l.endsOnTheCart),
+  hard.xs.join(' '));
+
+/* And the setting is wired to the game, not just to a table. */
+await api(() => globalThis.__niulaiFight.setDifficulty('hard'));
+const remembered = await page.evaluate(() => ({
+  setting: globalThis.__niulaiFight.difficulty,
+  saved: localStorage.getItem('niulai-fight.difficulty'),
+  lit: document.querySelector('#levels button[data-level="hard"]').getAttribute('aria-pressed')
+}));
+check('choosing one lights it up and remembers it',
+  remembered.setting === 'hard' && remembered.saved === 'hard' && remembered.lit === 'true',
+  `${remembered.setting}, saved ${remembered.saved}`);
+
+/* Tagged so the wait below is for the *next* round rather than for a state the
+ * current one might already be in — and so a setting that never reaches the
+ * game fails a check instead of hanging until the timeout. */
+await api(() => { globalThis.__niulaiFight.game.__previous = true; });
+await page.click('#t-restart');
+await page.waitForFunction(() => globalThis.__niulaiFight.game &&
+  !globalThis.__niulaiFight.game.__previous, null, { timeout: 120000 });
+const onHard = await api(() => {
+  const g = globalThis.__niulaiFight.game;
+  globalThis.__niulaiFight.stop();          // back to driving the clock ourselves
+  // Walk into the first gate and let the wave arrive, which is where the wolf's
+  // health actually comes from.
+  g.player.position.set(g.gates[0].x - 0.3, 0, 0.2);
+  globalThis.__niulaiFight.step(2.5);
+  return {
+    id: g.difficulty.id,
+    stages: g.gates.length,
+    wolves: g.enemies.map((e) => e.maxHealth),
+    label: document.getElementById('difficulty').textContent,
+    stage: document.getElementById('stage').textContent
+  };
+});
+check('the next round is played on the setting that was chosen', onHard.id === 'hard',
+  onHard.id);
+check('a hard run is nine stages of tougher wolves',
+  onHard.stages === 9 && onHard.wolves.length > 0 && onHard.wolves.every((h) => h === hard.health),
+  `${onHard.stages} stages, wolves at ${onHard.wolves.join('/')}`);
+check('and the HUD says which run you are in',
+  onHard.label === 'HARD' && onHard.stage === '1/9', `${onHard.label} ${onHard.stage}`);
+
+const cart = await api(() => {
+  const boss = globalThis.__toBoss();
+  const g = globalThis.__niulaiFight.game;
+  return { health: boss.fighter.maxHealth, registry: g.specs.cart.stats.health };
+});
+check('the Cart at the end of it is tougher too', cart.health > cart.registry,
+  `${cart.health} against ${cart.registry} on Easy`);
+
+// Left as it was found, so a player who ran the suite is not quietly on Hard.
+await api(() => globalThis.__niulaiFight.setDifficulty('easy'));
 
 check('still no script errors after playing', errors.length === 0, errors[0] || '');
 

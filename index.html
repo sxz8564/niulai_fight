@@ -117,6 +117,23 @@
   #roster .blurb { color: #8b95a3; font-size: 13px; line-height: 1.5; min-height: 2.6em; }
   #roster .key { color: #5d6773; font-size: 12px; letter-spacing: .14em; }
 
+  /* Difficulty, under the roster: one row, all three visible, the chosen one
+     lit. A dropdown would hide two thirds of the decision behind a click, and
+     the whole point is that a player can see what they are turning down. */
+  #select .tier { margin: 16px 0 0; font-size: 13px; }
+  #levels { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center;
+            margin-top: 8px; }
+  #levels button { background: #1b2028; border: 2px solid #39424f; border-radius: 10px;
+                   color: #cdd6e0; font: inherit; padding: 8px 14px; cursor: pointer;
+                   display: grid; gap: 3px; justify-items: center; min-width: 132px; }
+  #levels button:hover, #levels button:focus-visible { border-color: #ffd76a; outline: none; }
+  #levels .name { font-size: 15px; letter-spacing: .12em; }
+  #levels .zh { color: #8b95a3; font-size: 13px; }
+  #levels .blurb { color: #5d6773; font-size: 12px; }
+  #levels button[aria-pressed="true"] { border-color: #ffd76a; color: #ffd76a;
+                                        background: #241f16; }
+  #levels button[aria-pressed="true"] .zh { color: #ffd76a; }
+
   #pad { position: fixed; inset: auto 0 0 0; padding: 18px;
          display: flex; justify-content: space-between; pointer-events: none; }
   #pad div { display: grid; grid-template-columns: repeat(3, 56px); gap: 6px; pointer-events: auto; }
@@ -148,6 +165,7 @@
       <span class="bar rage"><i id="rage"></i></span>
     </span>
     <span class="spacer"></span>
+    <span class="label" id="difficulty">EASY</span>
     <span class="label">STAGE <b id="stage">1/5</b></span>
     <span class="label">SCORE <b id="score">000000</b></span>
     <span class="tools">
@@ -170,6 +188,8 @@
   <h1>Niulai Fight <span>牛来大战</span></h1>
   <p>Choose a fighter</p>
   <div id="roster"></div>
+  <p class="tier">Difficulty</p>
+  <div id="levels" role="group" aria-label="Difficulty"></div>
   <p class="foot">1 / 2 or click · then ← → to move, J punch, K kick, L block</p>
   <button id="music" type="button" aria-pressed="true">♪ MUSIC ON</button>
 </div>

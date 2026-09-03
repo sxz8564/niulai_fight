@@ -25,8 +25,8 @@ and the only thing that survives is a silhouette.
 The line under the title in search results. End-user copy — plain words, no
 jargon. This lives in `manifest.json`.
 
-> A side-scrolling brawler in a browser tab. Punch through five stages of
-> wolves, call your mother, and face the Cart.
+> A side-scrolling brawler in a browser tab. Punch through five to nine stages
+> of wolves, call your mother, and face the Cart.
 
 ### Description
 
@@ -36,7 +36,14 @@ will see and do, not how it is built.
 > Turn a browser tab into a Famicom-era beat 'em up.
 >
 > Walk right. The screen stops. Wolves arrive. Clear them and the screen lets
-> you on — five stages of it, through woods and grassland.
+> you on — through woods and grassland, all the way to the Cart.
+>
+> Three difficulties
+>
+> • Easy: five stages, wolves that go down quickly.
+> • Normal: seven stages, wolves that take an extra hit.
+> • Hard: nine stages, wolves that take two more — and a Cart with nearly twice
+>   the health at the end of it.
 >
 > Two fighters
 >

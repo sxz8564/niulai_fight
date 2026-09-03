@@ -7,6 +7,7 @@ import { Power } from './power.js';
 import { soundBank } from './sound.js';
 import { buildStage, clampToBelt, BELT_NEAR, BELT_FAR, STAGE_START, STAGE_END } from './stage.js';
 import { createInput } from './input.js';
+import { difficultyById, gatesFor } from './difficulty.js';
 
 /*
  * Niulai Fight — a belt-scroller in the shape of the Famicom brawlers: walk
@@ -16,34 +17,24 @@ import { createInput } from './input.js';
  * fight, and with it the level becomes a sequence of small arenas.
  */
 
-/*
- * The level. Copied per game rather than used directly: `opened` is written to
- * as a wave is triggered, and a shared array would hand the next run a level
- * whose gates were all open already — every fight skipped.
- */
-const GATES = [
-  { x: 10, count: 2 },
-  { x: 26, count: 3 },
-  { x: 44, count: 3 },
-  { x: 62, count: 4 },
-  // The last gate is the Cart, with two wolves to keep the player honest while
-  // they are trying to watch it. More than two and the boss stops being the
-  // thing you are paying attention to.
-  { x: STAGE_END - 6, count: 2, boss: 'cart' }
-];
-
 export class Game {
   constructor(canvas, options = {}) {
     this.canvas = canvas;
     this.assetBase = options.assetBase || 'assets/';
     this.playerId = options.playerId || 'niulai';
+    /*
+     * How hard, and how long. The whole setting is two numbers — what a wolf
+     * can take and how many gates there are — so it changes the amount of the
+     * game rather than the shape of it.
+     */
+    this.difficulty = difficultyById(options.difficulty);
     this.onState = options.onState || (() => {});
     this.enemies = [];
     this.boss = null;
     this.power = null;          // set in load(), if the chosen hero has one
     this.beltNear = BELT_NEAR;
     this.beltFar = BELT_FAR;
-    this.gates = GATES.map((gate) => ({ ...gate }));
+    this.gates = gatesFor(this.difficulty);
     this.gateIndex = 0;
     this.score = 0;
     this.lives = 3;
@@ -300,7 +291,8 @@ export class Game {
     const x = this.player.position.x + (fromRight ? 9 : -9);
     const z = BELT_FAR + Math.random() * (BELT_NEAR - BELT_FAR);
     const enemy = this.spawnFighter('wolfwolf', { x, z }, {
-      health: 34, speed: 2.5, damage: 8, team: 'enemy', facing: fromRight ? -1 : 1
+      health: this.difficulty.wolf.health, speed: 2.5, damage: 8,
+      team: 'enemy', facing: fromRight ? -1 : 1
     });
     enemy.thinkTimer = Math.random() * 0.5;
     this.enemies.push(enemy);
@@ -439,8 +431,12 @@ export class Game {
   spawnBoss(gate) {
     const spec = this.specs[gate.boss];
     if (!spec) throw new Error(`No boss called "${gate.boss}" in the registry`);
+    // The Cart grows with the difficulty too. A nine-stage run that ends on
+    // the same boss as a five-stage one ends on an anticlimax.
+    const stats = { ...(spec.stats || {}) };
+    if (stats.health) stats.health = Math.round(stats.health * this.difficulty.boss);
     const fighter = this.spawnFighter(gate.boss, { x: gate.x + 3.5, z: 0.1 }, {
-      ...(spec.stats || {}), team: 'enemy', facing: -1
+      ...stats, team: 'enemy', facing: -1
     });
     this.enemies.push(fighter);
     this.bossSpec = spec;
@@ -598,6 +594,8 @@ export class Game {
       // reads as a bug to everyone who sees it.
       stage: Math.min(this.gateIndex + 1, this.gates.length),
       stages: this.gates.length,
+      difficulty: this.difficulty.id,
+      difficultyName: this.difficulty.name,
       over: this.over,
       won: this.won,
       cheering: this.over && this.won,

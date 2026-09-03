@@ -30,6 +30,15 @@ export async function chooseCharacter(assetBase, root) {
     }
 
     function onKey(event) {
+      /*
+       * Enter on the difficulty row or the music switch belongs to that button,
+       * not to the roster. Without this, a player tabbing across the screen
+       * presses HARD and the game starts under them on the fighter they had not
+       * chosen yet — and the digits are no different: 1 while a level button
+       * has focus is a keystroke meant for that row.
+       */
+      const focused = document.activeElement;
+      if (focused && focused.closest && focused.closest('#levels, #music')) return;
       const index = Number(event.key) - 1;
       if (heroes[index]) { event.preventDefault(); pick(heroes[index].id); }
       if (event.key === 'Enter' && heroes[0]) pick(heroes[0].id);

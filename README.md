@@ -47,6 +47,32 @@ Stepping up and down is not decoration. An attack only lands if you are close
 in X *and* nearly level in Z, so a wolf standing a metre upstage cannot hit you
 and you cannot hit it. Circling is how you fight three at once.
 
+## Difficulty
+
+Three of them, under the roster, remembered between visits.
+
+| | Stages | A wolf takes | The Cart |
+| --- | --- | --- | --- |
+| **Easy** | 5 | 34 | 220 |
+| **Normal** | 7 | 46 | 308 |
+| **Hard** | 9 | 60 | 396 |
+
+Easy is the game exactly as it shipped before there was a choice, which is the
+point: nobody's idea of what this game is should change underneath them.
+
+Two knobs and no more — health and length. Faster wolves, or wolves that hit
+harder, would change what the game *asks* of a player: a different reaction
+time, a different amount of blocking. More health and more stages only ask for
+more of what they are already doing, and that is the difference a difficulty
+setting is supposed to make. The extra gates go in ahead of the Cart rather
+than at the start, so the opening fights of a hard run are the opening fights
+of an easy one and the ending is still the ending.
+
+`src/game/difficulty.js` is the whole thing: the table, and the function that
+builds a gate list from it. The level was a constant in `game.js` before this
+and is now generated per run, which also means a run can no longer inherit the
+gates another one left open.
+
 ## Sound
 
 Five short files, played through `<audio>` elements. No mixer, no graph, no
@@ -236,7 +262,7 @@ no bar.
 
 ## Winning
 
-Clear the fifth stage and the game stops being a fight. Niulai plants himself
+Clear the last stage and the game stops being a fight. Niulai plants himself
 and goes into a sweep kick and a backflip, on a loop, while the camera leaves
 its fighting distance and comes in to watch — and the banner moves to the top of
 the screen so the words are not standing on top of him.
@@ -260,7 +286,7 @@ does not is a character standing still at the end of a won run.
 
 ## The Cart
 
-The fifth stage is not more wolves. **The Cart 木车** rolls in with two of them,
+The last stage is not more wolves. **The Cart 木车** rolls in with two of them,
 and it has exactly one attack:
 
 1. It follows you, slowly. Too slowly to catch anyone who keeps moving — it is
@@ -273,7 +299,7 @@ and it has exactly one attack:
 
 That loop is the whole fight, and every part of it is there to make the attack
 answerable. The charge holds the lane it committed to during the wind-up, so
-the answer is to step off that line — the third axis the first four stages let
+the answer is to step off that line — the third axis the stages before it let
 you ignore. Blocking works too and costs you a fifth of the damage, where
 moving costs nothing. The stall afterwards is the only window worth punching
 in, so the fight is a rhythm rather than a race.
@@ -493,6 +519,7 @@ src/
     ├── sound.js       the sound bank, and enough voices to overlap
     ├── actor.js       rigged models, props, and the placeholder body
     ├── stage.js       ground, trees, the painted backdrop
+    ├── difficulty.js  the three settings, and the gates each one builds
     └── input.js       keyboard and touch
 ```
 

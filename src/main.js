@@ -1,6 +1,7 @@
 import { Game } from './game/game.js';
 import { chooseCharacter } from './select.js';
 import { soundBank } from './game/sound.js';
+import { DIFFICULTIES, difficultyById } from './game/difficulty.js';
 
 /*
  * Bootstrap: choose a fighter, play a round, offer another.
@@ -19,6 +20,7 @@ const canvas = document.getElementById('view');
 const selectScreen = document.getElementById('select');
 const roster = document.getElementById('roster');
 const loading = document.getElementById('loading');
+const levels = document.getElementById('levels');
 
 const hud = {
   health: document.getElementById('health'),
@@ -34,7 +36,8 @@ const hud = {
   padPower: document.getElementById('padpower'),
   bossRow: document.getElementById('bossrow'),
   bossName: document.getElementById('bossname'),
-  bossHealth: document.getElementById('bosshealth')
+  bossHealth: document.getElementById('bosshealth'),
+  difficulty: document.getElementById('difficulty')
 };
 
 function paint(state) {
@@ -46,6 +49,10 @@ function paint(state) {
   hud.lives.textContent = '🐮'.repeat(Math.max(0, state.lives));
   hud.score.textContent = String(state.score).padStart(6, '0');
   hud.stage.textContent = `${state.stage}/${state.stages}`;
+  // Named in the HUD, not just on the screen you chose it from: "3/9" means
+  // something quite different from "3/5" and the player should not have to
+  // work out which run they are in.
+  hud.difficulty.textContent = state.difficultyName || '';
 
   /*
    * The rage meter, and the key that spends it, both appear only for a fighter
@@ -135,6 +142,43 @@ paintMusic(sounds.musicOn);
 musicButton.addEventListener('click', () => paintMusic(sounds.toggleMusic()));
 
 /*
+ * Difficulty. Chosen on the roster screen, remembered between visits, and read
+ * when a round starts — so it applies from the next round rather than changing
+ * the level under a fight already in progress.
+ */
+const LEVEL_KEY = 'niulai-fight.difficulty';
+let difficulty = DIFFICULTIES[0].id;
+try {
+  const saved = localStorage.getItem(LEVEL_KEY);
+  if (saved) difficulty = difficultyById(saved).id;   // unknown ids fall back
+} catch { /* private mode: play on Easy */ }
+
+const levelButtons = DIFFICULTIES.map((level) => {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.dataset.level = level.id;
+  button.innerHTML = '<span class="name"></span><span class="zh"></span>' +
+    '<span class="blurb"></span>';
+  button.querySelector('.name').textContent = level.name;
+  button.querySelector('.zh').textContent = level.nameChinese || '';
+  button.querySelector('.blurb').textContent = level.blurb || '';
+  button.addEventListener('click', () => setDifficulty(level.id));
+  button.addEventListener('pointerenter', () => sounds.play('select'));
+  levels.appendChild(button);
+  return button;
+});
+
+function setDifficulty(id) {
+  difficulty = difficultyById(id).id;
+  for (const button of levelButtons) {
+    button.setAttribute('aria-pressed', String(button.dataset.level === difficulty));
+  }
+  try { localStorage.setItem(LEVEL_KEY, difficulty); } catch { /* ignore */ }
+  return difficulty;
+}
+setDifficulty(difficulty);
+
+/*
  * In-game controls. Wired once, like the roster's switch, because they are part
  * of the page rather than of the round — a listener added per round would fire
  * twice on the second one. What they act on is the round that happens to be
@@ -173,7 +217,9 @@ window.addEventListener('keydown', (event) => {
 let offerChoice = null;
 globalThis.__niulaiFight = {
   sounds,
-  choose(id) { if (offerChoice) offerChoice(id); }
+  choose(id) { if (offerChoice) offerChoice(id); },
+  get difficulty() { return difficulty; },
+  setDifficulty(id) { return setDifficulty(id); }
 };
 
 /** Shows the select screen and resolves with the chosen character's id. */
@@ -211,7 +257,7 @@ async function playRound(playerId) {
   loading.hidden = false;
   hud.banner.hidden = true;
 
-  const game = new Game(canvas, { onState: paint, playerId });
+  const game = new Game(canvas, { onState: paint, playerId, difficulty });
 
   function fit() {
     game.resize(canvas.clientWidth || window.innerWidth, canvas.clientHeight || window.innerHeight);

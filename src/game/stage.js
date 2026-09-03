@@ -11,7 +11,14 @@ import * as THREE from 'three';
 export const BELT_NEAR = 1.6;   // toward the camera
 export const BELT_FAR = -1.4;   // away from it
 export const STAGE_START = -4;  // where the level begins
-export const STAGE_END = 86;    // where the level stops
+/*
+ * Long enough for the longest run. Hard's last gate is at 152, and the level a
+ * given difficulty uses simply stops earlier — the ground is built once, to
+ * fit them all, rather than rebuilt to a different length per setting. Nobody
+ * on Easy ever sees past 80: the gate holds them, and the run is won the
+ * moment the Cart falls.
+ */
+export const STAGE_END = 158;   // where the level stops
 
 const TREE_COLORS = ['#3f6d3a', '#4b7a3f', '#356034', '#5b8a45'];
 
@@ -96,9 +103,12 @@ export function buildStage(scene, textures) {
   // Grass tufts on the belt itself, low enough to run through.
   const tuftGeo = new THREE.ConeGeometry(0.09, 0.28, 4);
   const tuftMat = new THREE.MeshStandardMaterial({ color: '#5f7f3c', roughness: 1 });
-  const tufts = new THREE.InstancedMesh(tuftGeo, tuftMat, 420);
+  // Counted from the length rather than fixed, so a longer level is not a
+  // sparser one — this was 420 tufts over 106 units of ground.
+  const count = Math.round((STAGE_END + 20) * 4);
+  const tufts = new THREE.InstancedMesh(tuftGeo, tuftMat, count);
   const m = new THREE.Matrix4();
-  for (let i = 0; i < 420; i++) {
+  for (let i = 0; i < count; i++) {
     m.makeTranslation(-6 + rng() * (STAGE_END + 20), 0.14,
       BELT_FAR - 1 + rng() * (BELT_NEAR - BELT_FAR + 2.4));
     tufts.setMatrixAt(i, m);
@@ -114,9 +124,12 @@ export function buildStage(scene, textures) {
   if (textures.backdrop) {
     textures.backdrop.colorSpace = THREE.SRGBColorSpace;
     textures.backdrop.wrapS = THREE.RepeatWrapping;
-    textures.backdrop.repeat.set(6, 1);
+    // Tiled at a fixed size on the ground rather than a fixed number of
+    // repeats, so the painting behind a long level is not a stretched one.
+    const width = STAGE_END + 80;
+    textures.backdrop.repeat.set(Math.round(width / 27.7), 1);
     const sky = new THREE.Mesh(
-      new THREE.PlaneGeometry(STAGE_END + 80, 22),
+      new THREE.PlaneGeometry(width, 22),
       new THREE.MeshBasicMaterial({ map: textures.backdrop, depthWrite: false }));
     sky.position.set(STAGE_END / 2 - 6, 8, -18);
     scene.add(sky);
