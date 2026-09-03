@@ -44,6 +44,26 @@
      .hidden on these would otherwise change nothing and leave the loading
      screen sitting on top of a running game. */
   #loading[hidden], #banner[hidden], #select[hidden], #bossrow[hidden] { display: none; }
+  #paused[hidden] { display: none; }
+
+  /* The three controls a player wants without leaving the fight. The HUD takes
+     no pointer events so a tap meant for the pad is never eaten by the score;
+     these are the one part of it that has to. */
+  .tools { display: flex; gap: 6px; pointer-events: auto; }
+  .tools button { width: 36px; height: 32px; padding: 0;
+                  border: 2px solid #4b5563; background: #10141acc; color: #cdd6e0;
+                  font: inherit; font-size: 14px; line-height: 1; border-radius: 7px;
+                  cursor: pointer; }
+  .tools button:hover, .tools button:focus-visible { border-color: #ffd76a; color: #ffd76a;
+                                                     outline: none; }
+  .tools button.off { color: #5d6773; border-color: #2b323c; }
+
+  #paused { position: fixed; inset: 0; display: grid; place-items: center; align-content: center;
+            gap: 14px; background: #10141a99; color: #ffd76a;
+            font-size: clamp(26px, 5.6vw, 60px); letter-spacing: .1em; text-align: center;
+            text-shadow: 0 4px 0 #000, 0 0 14px rgba(0, 0, 0, .8); pointer-events: none; }
+  #paused .again { color: #f4e7cf; font-size: 17px; letter-spacing: .18em;
+                   text-shadow: 0 2px 0 #000, 0 0 6px rgba(0, 0, 0, .85); }
   #ragewrap[hidden], #ragelabel[hidden], #hint[hidden] { display: none; }
 
   /* The rage meter. Narrower than the health bar and a different colour, so a
@@ -130,15 +150,21 @@
     <span class="spacer"></span>
     <span class="label">STAGE <b id="stage">1/5</b></span>
     <span class="label">SCORE <b id="score">000000</b></span>
+    <span class="tools">
+      <button id="t-music" type="button" aria-label="music on" aria-pressed="true">♪</button>
+      <button id="t-pause" type="button" aria-label="pause" aria-pressed="false">❚❚</button>
+      <button id="t-restart" type="button" aria-label="restart">↻</button>
+    </span>
   </div>
   <div class="row" id="bossrow" hidden>
     <span class="label" id="bossname">THE CART 木车</span>
     <span class="bar boss"><i id="bosshealth"></i></span>
   </div>
-  <div class="row"><span class="hint" id="hint">← → move · ↑ ↓ step up and down · J punch · K kick · L hold to block</span></div>
+  <div class="row"><span class="hint" id="hint">← → move · ↑ ↓ step up and down · J punch · K kick · L hold to block · P pause</span></div>
 </div>
 
 <div id="banner" hidden></div>
+<div id="paused" hidden>PAUSED<div class="again">P or ❚❚ to resume</div></div>
 
 <div id="select">
   <h1>Niulai Fight <span>牛来大战</span></h1>

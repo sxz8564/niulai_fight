@@ -70,9 +70,16 @@ check('every file the extension references exists', absent.length === 0,
   absent.length ? `missing: ${absent.join(', ')}` : `${referenced.length} checked`);
 
 const profile = mkdtempSync(join(tmpdir(), 'niulai-fight-'));
+/*
+ * The full browser, not the headless shell Playwright now reaches for by
+ * default: the shell has no extension support at all, so `--load-extension`
+ * is silently ignored and every check below fails on a build that is fine.
+ */
 const context = await chromium.launchPersistentContext(profile, {
   headless: true,
-  executablePath: process.env.PLAYWRIGHT_CHROMIUM || undefined,
+  ...(process.env.PLAYWRIGHT_CHROMIUM
+    ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM }
+    : { channel: 'chromium' }),
   viewport: { width: 1280, height: 720 },
   args: [
     '--no-sandbox',

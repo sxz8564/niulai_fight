@@ -67,7 +67,7 @@ function paint(state) {
     hud.padPower.textContent = rage.name.slice(0, 1);
   }
   hud.hint.textContent = '← → move · ↑ ↓ step up and down · J punch · K kick · ' +
-    'L hold to block' + (rage ? ` · M ${rage.name} when the bar is full` : '');
+    'L hold to block' + (rage ? ` · M ${rage.name} when the bar is full` : '') + ' · P pause';
   // The controls are no use once the run is over, and they sit directly under
   // the banner.
   hud.hint.hidden = Boolean(state.over);
@@ -114,12 +114,59 @@ function paint(state) {
  */
 const sounds = soundBank('assets/');
 const musicButton = document.getElementById('music');
+const tools = {
+  music: document.getElementById('t-music'),
+  pause: document.getElementById('t-pause'),
+  restart: document.getElementById('t-restart')
+};
+const pausedScreen = document.getElementById('paused');
+
+/* Two switches for one setting: the roster's and the one in the fight. Both are
+ * painted from the same state so neither can disagree with what you can hear. */
 function paintMusic(on) {
   musicButton.textContent = on ? '♪ MUSIC ON' : '♪ MUSIC OFF';
   musicButton.setAttribute('aria-pressed', String(on));
+  tools.music.textContent = on ? '♪' : '🔇';
+  tools.music.setAttribute('aria-label', on ? 'music on' : 'music off');
+  tools.music.setAttribute('aria-pressed', String(on));
+  tools.music.classList.toggle('off', !on);
 }
 paintMusic(sounds.musicOn);
 musicButton.addEventListener('click', () => paintMusic(sounds.toggleMusic()));
+
+/*
+ * In-game controls. Wired once, like the roster's switch, because they are part
+ * of the page rather than of the round — a listener added per round would fire
+ * twice on the second one. What they act on is the round that happens to be
+ * running, which is what `paused` and `endRound` are for.
+ */
+let paused = false;
+let endRound = null;
+
+function setPaused(on) {
+  paused = Boolean(on) && Boolean(endRound);
+  pausedScreen.hidden = !paused;
+  tools.pause.textContent = paused ? '▶' : '❚❚';
+  tools.pause.setAttribute('aria-label', paused ? 'resume' : 'pause');
+  tools.pause.setAttribute('aria-pressed', String(paused));
+}
+
+/* The buttons sit inside a window-level "tap anywhere to play again" listener,
+ * so a click on one of them must not also end the round it belongs to. */
+for (const button of Object.values(tools)) {
+  button.addEventListener('pointerdown', (event) => event.stopPropagation());
+}
+tools.music.addEventListener('click', () => paintMusic(sounds.toggleMusic()));
+tools.pause.addEventListener('click', () => setPaused(!paused));
+tools.restart.addEventListener('click', () => {
+  if (endRound) endRound('again');
+});
+window.addEventListener('keydown', (event) => {
+  // Only while a round is actually running: P on the roster should do nothing.
+  if (!endRound || event.key.toLowerCase() !== 'p') return;
+  event.preventDefault();
+  setPaused(!paused);
+});
 
 /* The harness needs a handle before a human has chosen anything — and the
  * sound bank outlives every round, so it hangs here rather than off the game. */
@@ -187,7 +234,10 @@ async function playRound(playerId) {
     raf = requestAnimationFrame(frame);
     const dt = (now - previous) / 1000;
     previous = now;
-    game.update(dt);
+    // Paused stops the clock, not the picture: the scene stays on screen behind
+    // the overlay rather than going black, and nothing accumulates to be caught
+    // up on when it resumes, because the frame still runs and dt still resets.
+    if (!paused) game.update(dt);
     game.render();
     paint(game.snapshot());
   }
@@ -204,7 +254,11 @@ async function playRound(playerId) {
     },
     press(action) { game.input.press(action); },
     release(action) { game.input.release(action); },
-    stop() { cancelAnimationFrame(raf); }
+    stop() { cancelAnimationFrame(raf); },
+    /* The other half of stop(). Pause lives in the real frame loop — it is the
+     * clock that stops, not the picture — so the only honest way to test it is
+     * to let that loop run and watch the world stand still while time passes. */
+    run() { cancelAnimationFrame(raf); previous = performance.now(); raf = requestAnimationFrame(frame); }
   });
 
   /*
@@ -212,8 +266,12 @@ async function playRound(playerId) {
    * The keys are only listened for once the game is actually over, so R during
    * a fight does nothing rather than throwing away a run in progress.
    */
+  setPaused(false);
   const next = await new Promise((resolve) => {
+    endRound = finish;
     function finish(choice) {
+      endRound = null;
+      setPaused(false);
       window.removeEventListener('keydown', onKey);
       window.removeEventListener('pointerdown', onPointer);
       resolve(choice);

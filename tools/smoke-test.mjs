@@ -1671,6 +1671,134 @@ check('the banner moves off the hero when the news is good',
   await page.evaluate(() => document.getElementById('banner').classList.contains('won')));
 await page.screenshot({ path: join(shots, '5-win.png'), animations: 'disabled' });
 
+/* ------------------------------------------------------ the game controls --
+ *
+ * Music, pause and restart, without leaving the fight.
+ */
+const controlsExist = await page.evaluate(() => ['t-music', 't-pause', 't-restart']
+  .filter((id) => !document.getElementById(id)));
+check('the fight has its three controls', controlsExist.length === 0,
+  controlsExist.length ? `missing: ${controlsExist.join(', ')}` : 'music, pause, restart');
+
+/*
+ * Pause has to stop the clock, not the frame. The scene stays on screen behind
+ * the overlay, so what proves it is the simulation standing still while real
+ * time passes — read from the world rather than from a flag.
+ */
+await api(() => {
+  const g = globalThis.__niulaiFight.game;
+  g.player.position.set(2, 0, 0.2);
+  g.player.health = g.player.maxHealth;
+  g.player.dead = false; g.player.downTimer = 0; g.player.stunTimer = 0;
+  g.over = false; g.won = false;
+  // The suite normally drives the clock itself. Pause lives in the frame loop,
+  // so for this one stretch the game runs on its own like a player's does.
+  globalThis.__niulaiFight.run();
+  globalThis.__niulaiFight.press('right');
+});
+/* Software GL runs a handful of frames a second, so the test waits for frames
+ * rather than for wall-clock milliseconds — a fixed timeout would measure the
+ * renderer, not the pause. */
+const frames = (count) => page.evaluate((n) => new Promise((resolve) => {
+  let left = n;
+  const tick = () => (--left <= 0 ? resolve() : requestAnimationFrame(tick));
+  requestAnimationFrame(tick);
+}), count);
+
+await page.waitForFunction(() => globalThis.__niulaiFight.game.player.position.x > 2.5,
+  null, { timeout: 30000 });
+const walking = await api(() => globalThis.__niulaiFight.game.player.position.x);
+await page.click('#t-pause');
+const pausedAt = await api(() => globalThis.__niulaiFight.game.player.position.x);
+await frames(10);
+const whilePaused = await api(() => ({
+  x: globalThis.__niulaiFight.game.player.position.x,
+  overlay: !document.getElementById('paused').hidden
+}));
+await page.click('#t-pause');
+await frames(10);
+const resumed = await api(() => ({
+  x: globalThis.__niulaiFight.game.player.position.x,
+  overlay: !document.getElementById('paused').hidden
+}));
+await api(() => {
+  globalThis.__niulaiFight.release('right');
+  globalThis.__niulaiFight.stop();
+});
+check('it was actually moving before the pause', walking > 2.5,
+  `walked to ${walking.toFixed(2)}`);
+check('pausing stops the world', Math.abs(whilePaused.x - pausedAt) < 0.001 && whilePaused.overlay,
+  `${(whilePaused.x - pausedAt).toFixed(4)} of movement over 10 frames, overlay ${whilePaused.overlay ? 'up' : 'missing'}`);
+check('and letting go starts it again', resumed.x > whilePaused.x + 0.2 && !resumed.overlay,
+  `moved ${(resumed.x - whilePaused.x).toFixed(2)} once resumed`);
+
+await page.keyboard.press('KeyP');
+const byKey = await page.evaluate(() => !document.getElementById('paused').hidden);
+await page.keyboard.press('KeyP');
+const byKeyAgain = await page.evaluate(() => !document.getElementById('paused').hidden);
+check('P does it from the keyboard', byKey && !byKeyAgain,
+  `pressed: ${byKey}, pressed again: ${byKeyAgain}`);
+
+/* One setting, two switches: the roster's and the fight's. */
+await page.click('#t-music');
+const muted = await page.evaluate(() => ({
+  on: globalThis.__niulaiFight.sounds.musicOn,
+  roster: document.getElementById('music').textContent,
+  glyph: document.getElementById('t-music').textContent
+}));
+await page.click('#t-music');
+const unmuted = await page.evaluate(() => ({
+  on: globalThis.__niulaiFight.sounds.musicOn,
+  roster: document.getElementById('music').textContent
+}));
+check('the fight can mute the music, and the roster agrees',
+  muted.on === false && muted.roster.includes('OFF') && unmuted.on === true &&
+  unmuted.roster.includes('ON'),
+  `${muted.glyph} / ${muted.roster}`);
+
+/*
+ * And the awkward one. These buttons sit inside a window-level "tap anywhere to
+ * play again" listener, so a click on the music or pause button while the run
+ * is over would otherwise throw the run away as a side effect of turning the
+ * sound down.
+ */
+await api(() => {
+  const g = globalThis.__niulaiFight.game;
+  g.score = 4321;
+  g.over = true;
+  g.won = false;
+  g.onState(g.snapshot());
+});
+await page.click('#t-music');
+await page.click('#t-music');
+await page.click('#t-pause');
+await page.click('#t-pause');
+await page.waitForTimeout(200);
+const survived = await api(() => {
+  const g = globalThis.__niulaiFight.game;
+  return { score: g.score, over: g.over };
+});
+check('the music and pause buttons do not end the run under them',
+  survived.score === 4321, `score ${survived.score} after four clicks on a finished run`);
+
+/* The restart button, on the other hand, is meant to. */
+await page.click('#t-restart');
+await page.waitForFunction(() => globalThis.__niulaiFight.game &&
+  globalThis.__niulaiFight.game.score === 0, null, { timeout: 60000 });
+const restarted = await api(() => {
+  const g = globalThis.__niulaiFight.game;
+  globalThis.__niulaiFight.stop();   // back to driving the clock ourselves
+  return {
+    score: g.score, over: g.over, player: g.snapshot().player,
+    anyGateOpened: g.gates.some((gate) => gate.opened),
+    paused: !document.getElementById('paused').hidden
+  };
+});
+check('the restart button starts a fresh round with the same fighter',
+  restarted.score === 0 && restarted.over === false && restarted.player === 'niulai' &&
+  !restarted.anyGateOpened && !restarted.paused,
+  `${restarted.player}, score ${restarted.score}`);
+
 /*
  * Restarting. The interesting part is not that a new game appears — it is that
  * it is a *new* one. The level was a module-level array whose `opened` flags
