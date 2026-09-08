@@ -19,6 +19,8 @@ const { chromium } = require('playwright');
 // Read from the game's own module rather than repeated here, so a change to
 // where the tutorial holds the player cannot quietly pass this suite.
 const { HOLD_AT: HOLD } = await import('../src/game/tutorial.js');
+const { GROUND } = await import('../src/game/stage.js');
+const GROUND_DEFAULTS = [GROUND.grass, GROUND.path, GROUND.tuft, GROUND.bush, ...GROUND.trees];
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const shots = join(root, '.smoke');
 mkdirSync(shots, { recursive: true });
@@ -2192,6 +2194,65 @@ check('a backdrop is drawn at the shape it was painted at',
   drawn && Math.abs(painted - drawn.image) / drawn.image < 0.08,
   drawn ? `${painted.toFixed(2)} against ${drawn.image.toFixed(2)} (${drawn.src})` : 'no backdrop');
 
+/*
+ * And the ground in front of it. Every painting names its own field: a fight in
+ * front of a violet wood at sunset standing on orchard green is two pictures in
+ * one, and no amount of matching the sky fixes that.
+ */
+const schemes = gallery.map((scene) => scene.ground);
+const hex = /^#[0-9a-f]{6}$/i;
+check('every backdrop dresses its own field',
+  schemes.every((g) => g && [g.grass, g.path, g.tuft, g.bush, g.trunk].every((c) => hex.test(c)) &&
+    Array.isArray(g.trees) && g.trees.length === 4 && g.trees.every((c) => hex.test(c))),
+  `${schemes.filter(Boolean).length} palettes`);
+check('and no two of them are the same field',
+  new Set(schemes.map((g) => g.grass)).size === schemes.length,
+  schemes.map((g) => g.grass).join(' '));
+
+/*
+ * The rules the schemes are built on, which are the reason they read as fields
+ * rather than as colours: the path is a lighter line through the grass, the
+ * tufts and bushes sit under it, and nothing is ever so dark or so bleached
+ * that two fighters on it stop being two fighters on it.
+ */
+const luma = (colour) => {
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(colour.slice(i, i + 2), 16) / 255);
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+};
+const broken = gallery.filter(({ ground: g }) => !(
+  luma(g.path) > luma(g.grass) &&
+  luma(g.tuft) < luma(g.grass) &&
+  luma(g.bush) <= luma(g.grass) &&
+  luma(g.grass) > 0.08 && luma(g.grass) < 0.62
+));
+check('every field is a field: a lighter path, darker tufts, and a floor and ceiling',
+  broken.length === 0,
+  broken.length ? broken.map((s) => s.id).join(', ') : gallery.length + ' schemes');
+
+/* And the field the round is actually played on is that scheme, not a default
+ * that happens to look green. Every flat-coloured thing in the scene, read off
+ * the materials the stage was actually built with. */
+const fieldColours = () => api(() => {
+  const g = globalThis.__niulaiFight.game;
+  const seen = new Set();
+  g.scene.traverse((node) => {
+    if (node.isMesh && node.material && node.material.color && !node.material.map) {
+      seen.add('#' + node.material.color.getHexString());
+    }
+  });
+  return { id: g.background.id, colours: [...seen] };
+});
+/** Which of a scheme's colours are nowhere on screen. */
+const unpaintedIn = (field) => {
+  const scheme = gallery.find((scene) => scene.id === field.id).ground;
+  return [scheme.grass, scheme.path, scheme.tuft, scheme.bush, scheme.trunk, ...scheme.trees]
+    .filter((colour) => !field.colours.includes(colour));
+};
+const orchard = await fieldColours();
+check('the field on screen is the one its backdrop asked for',
+  unpaintedIn(orchard).length === 0,
+  unpaintedIn(orchard).join(', ') || `${orchard.colours.length} colours, all of them its own`);
+
 /* And the air in front of it. */
 await api(() => globalThis.__niulaiFight.setBackground('lantern-night'));
 await api(() => { globalThis.__niulaiFight.game.__previous = true; });
@@ -2218,6 +2279,17 @@ check('and the air in front of it is the colour of its sky',
   `${night.painted} / ${night.fog} against ${night.sky}`);
 check('a night scene is lit like one', night.light < day.light,
   `${night.light.toFixed(2)} against ${day.light.toFixed(2)} in the orchard`);
+
+/* The stronger half of the same check: this scheme shares nothing with the
+ * defaults, so a stage still built from the fallbacks fails every colour of it
+ * rather than passing by looking green. */
+const valley = await fieldColours();
+const stillOrchard = GROUND_DEFAULTS.filter((colour) => valley.colours.includes(colour));
+check('changing the backdrop repaints the whole field under it',
+  unpaintedIn(valley).length === 0 && stillOrchard.length === 0,
+  unpaintedIn(valley).length
+    ? `never painted: ${unpaintedIn(valley).join(', ')}`
+    : (stillOrchard.length ? `the orchard is still there: ${stillOrchard.join(', ')}` : 'all of it'));
 
 /* -------------------------------------------------------------- the shake --
  *

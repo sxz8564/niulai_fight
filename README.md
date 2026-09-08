@@ -118,6 +118,22 @@ fogs the far trees into, and — scaled by its own brightness, with a floor so
 the fight stays readable — how much light there is. A night valley behind a
 field lit like noon is the sort of thing nobody can name but everybody sees.
 
+Each painting also dresses the field in front of it. Grass, path, tufts,
+bushes, trunks and four tree colours per scene, in the registry beside the
+backdrop — because a fight in front of a violet wood at sunset, standing on
+orchard green, is two pictures in one and no amount of matching the sky fixes
+it. The seven schemes are authored rather than sampled: the tool proposes one
+by taking the hue of the painting's land and of its foliage and running them
+through the orchard's own ladder — how much lighter the path is than the grass,
+how far under it the bushes sit — and then someone looks at it. An existing
+scheme is never overwritten unless `--repalette` says so.
+
+Lightness is deliberately *not* taken from the painting. The material colours
+are albedo and the light is already scaled by how bright the sky is, so
+darkening a night painting's grass as well would take it to mud. The ladder
+holds the grass near where the orchard's sits and lets the lighting do the
+rest, which is why Lantern Night reads as a dark field rather than a black one.
+
 The paintings are 16:9 and the backdrop plane is 22 units tall, so one whole
 painting is 39 units wide. That number now comes from the image. It used to be
 27.7, which squeezed 16:9 into 5:4 and left every tree in the distance slightly
@@ -590,7 +606,7 @@ src/
     ├── power.js       the rage meter and what it summons
     ├── sound.js       the sound bank, and enough voices to overlap
     ├── actor.js       rigged models, props, and the placeholder body
-    ├── stage.js       ground, trees, the painted backdrop
+    ├── stage.js       ground, trees, the painted backdrop and its palette
     ├── difficulty.js  the three settings, and the gates each one builds
     ├── tutorial.js    the six lessons, and what finishes each of them
     └── input.js       keyboard and touch

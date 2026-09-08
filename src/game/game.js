@@ -132,7 +132,7 @@ export class Game {
 
     this.setSky(this.background.sky);
     this.lights(this.background.sky);
-    buildStage(this.scene, { backdrop });
+    buildStage(this.scene, { backdrop, ground: this.background.ground });
 
     const hero = this.specs[this.playerId];
     if (!hero) throw new Error(`No character called "${this.playerId}" in the registry`);

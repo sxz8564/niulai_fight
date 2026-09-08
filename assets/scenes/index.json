@@ -2,57 +2,148 @@
   {
     "id": "orchard-day",
     "name": "Orchard Day",
-    "nameChinese": "果园白日",
+    "nameChinese": "\u679c\u56ed\u767d\u65e5",
     "file": "orchard-day.webp",
     "thumb": "thumbs/orchard-day.webp",
-    "sky": "#ebe6b3"
+    "sky": "#ebe6b3",
+    "ground": {
+      "grass": "#6f8f4a",
+      "path": "#87a05a",
+      "tuft": "#5f7f3c",
+      "bush": "#4d7038",
+      "trunk": "#6b4a2f",
+      "trees": [
+        "#3f6d3a",
+        "#4b7a3f",
+        "#356034",
+        "#5b8a45"
+      ]
+    }
   },
   {
     "id": "cattle-valley",
     "name": "Cattle Valley",
-    "nameChinese": "牛谷",
+    "nameChinese": "\u725b\u8c37",
     "file": "cattle-valley.webp",
     "thumb": "thumbs/cattle-valley.webp",
-    "sky": "#7b7676"
+    "sky": "#7b7676",
+    "ground": {
+      "grass": "#6f6f52",
+      "path": "#83836a",
+      "tuft": "#5f6046",
+      "bush": "#4e5a42",
+      "trunk": "#5b4f40",
+      "trees": [
+        "#4c5a41",
+        "#586848",
+        "#41503c",
+        "#657356"
+      ]
+    }
   },
   {
     "id": "golden-grove",
     "name": "Golden Grove",
-    "nameChinese": "金林",
+    "nameChinese": "\u91d1\u6797",
     "file": "golden-grove.webp",
     "thumb": "thumbs/golden-grove.webp",
-    "sky": "#9c7040"
+    "sky": "#9c7040",
+    "ground": {
+      "grass": "#5b4a76",
+      "path": "#74588a",
+      "tuft": "#4e3f68",
+      "bush": "#4a3a63",
+      "trunk": "#4f3d55",
+      "trees": [
+        "#553f72",
+        "#634b84",
+        "#48355f",
+        "#71589a"
+      ]
+    }
   },
   {
     "id": "paintbox-wood",
     "name": "Paintbox Wood",
-    "nameChinese": "彩林",
+    "nameChinese": "\u5f69\u6797",
     "file": "paintbox-wood.webp",
     "thumb": "thumbs/paintbox-wood.webp",
-    "sky": "#936145"
+    "sky": "#936145",
+    "ground": {
+      "grass": "#4f4276",
+      "path": "#5f5289",
+      "tuft": "#453a68",
+      "bush": "#45407e",
+      "trunk": "#574064",
+      "trees": [
+        "#4a6bb0",
+        "#a4526f",
+        "#c47b34",
+        "#3f7f8c"
+      ]
+    }
   },
   {
     "id": "pale-plain",
     "name": "Pale Plain",
-    "nameChinese": "苍原",
+    "nameChinese": "\u82cd\u539f",
     "file": "pale-plain.webp",
     "thumb": "thumbs/pale-plain.webp",
-    "sky": "#e0d7ca"
+    "sky": "#e0d7ca",
+    "ground": {
+      "grass": "#8a8570",
+      "path": "#9a957f",
+      "tuft": "#7a7563",
+      "bush": "#6d705c",
+      "trunk": "#8d8577",
+      "trees": [
+        "#6b705a",
+        "#767b64",
+        "#5f6551",
+        "#828771"
+      ]
+    }
   },
   {
     "id": "lantern-night",
     "name": "Lantern Night",
-    "nameChinese": "灯夜",
+    "nameChinese": "\u706f\u591c",
     "file": "lantern-night.webp",
     "thumb": "thumbs/lantern-night.webp",
-    "sky": "#0b252b"
+    "sky": "#0b252b",
+    "ground": {
+      "grass": "#42705d",
+      "path": "#4e7f6b",
+      "tuft": "#376250",
+      "bush": "#31584c",
+      "trunk": "#46443a",
+      "trees": [
+        "#336456",
+        "#396f5d",
+        "#2b534b",
+        "#417e66"
+      ]
+    }
   },
   {
     "id": "star-valley",
     "name": "Star Valley",
-    "nameChinese": "星谷",
+    "nameChinese": "\u661f\u8c37",
     "file": "star-valley.webp",
     "thumb": "thumbs/star-valley.webp",
-    "sky": "#7e7977"
+    "sky": "#7e7977",
+    "ground": {
+      "grass": "#63705a",
+      "path": "#737f69",
+      "tuft": "#55624c",
+      "bush": "#4a5946",
+      "trunk": "#524b3e",
+      "trees": [
+        "#485741",
+        "#526149",
+        "#3e4c3c",
+        "#5d6b52"
+      ]
+    }
   }
 ]

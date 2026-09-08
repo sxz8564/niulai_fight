@@ -24,19 +24,34 @@ export const STAGE_END = 158;   // where the level stops
  * times its own aspect ratio — see buildStage. */
 const BACKDROP_HEIGHT = 22;
 
-const TREE_COLORS = ['#3f6d3a', '#4b7a3f', '#356034', '#5b8a45'];
+/*
+ * What the field is made of, when nobody says otherwise.
+ *
+ * This is the orchard's scheme, and every backdrop that ships names its own in
+ * the scene registry: a fight in front of a violet wood at sunset standing on
+ * this green is two paintings in one picture. The defaults stay here because a
+ * missing palette must not be a missing stage.
+ */
+export const GROUND = {
+  grass: '#6f8f4a',
+  path: '#87a05a',
+  tuft: '#5f7f3c',
+  bush: '#4d7038',
+  trunk: '#6b4a2f',
+  trees: ['#3f6d3a', '#4b7a3f', '#356034', '#5b8a45']
+};
 
-function tree(rng, x, z, kind) {
+function tree(rng, x, z, kind, ground) {
   const group = new THREE.Group();
   const trunkH = 1.2 + rng() * 1.6;
   const trunk = new THREE.Mesh(
     new THREE.CylinderGeometry(0.09, 0.14, trunkH, 7),
-    new THREE.MeshStandardMaterial({ color: '#6b4a2f', roughness: 1 }));
+    new THREE.MeshStandardMaterial({ color: ground.trunk, roughness: 1 }));
   trunk.position.y = trunkH / 2;
   trunk.castShadow = true;
   group.add(trunk);
 
-  const colour = TREE_COLORS[Math.floor(rng() * TREE_COLORS.length)];
+  const colour = ground.trees[Math.floor(rng() * ground.trees.length)];
   const material = new THREE.MeshStandardMaterial({ color: colour, roughness: 1 });
   if (kind === 'pine') {
     for (let i = 0; i < 3; i++) {
@@ -68,12 +83,15 @@ function seeded(seed) {
 
 export function buildStage(scene, textures) {
   const rng = seeded(20260901);
+  // Anything the scene does not name falls back to the orchard's, so a palette
+  // can say only what it wants to change.
+  const ground = { ...GROUND, ...(textures.ground || {}) };
 
   // Ground: grass strip the fight happens on, with darker earth behind it so
   // the playable belt reads as a distinct band rather than an endless field.
   const grass = new THREE.Mesh(
     new THREE.PlaneGeometry(STAGE_END + 40, 44),
-    new THREE.MeshStandardMaterial({ color: '#6f8f4a', roughness: 1 }));
+    new THREE.MeshStandardMaterial({ color: ground.grass, roughness: 1 }));
   grass.rotation.x = -Math.PI / 2;
   grass.position.set(STAGE_END / 2 - 6, 0, -6);
   grass.receiveShadow = true;
@@ -81,7 +99,7 @@ export function buildStage(scene, textures) {
 
   const path = new THREE.Mesh(
     new THREE.PlaneGeometry(STAGE_END + 40, BELT_NEAR - BELT_FAR + 0.6),
-    new THREE.MeshStandardMaterial({ color: '#87a05a', roughness: 1 }));
+    new THREE.MeshStandardMaterial({ color: ground.path, roughness: 1 }));
   path.rotation.x = -Math.PI / 2;
   path.position.set(STAGE_END / 2 - 6, 0.01, (BELT_NEAR + BELT_FAR) / 2);
   path.receiveShadow = true;
@@ -90,11 +108,12 @@ export function buildStage(scene, textures) {
   // Trees, thinned out inside the belt so they never stand where a fight is.
   const trees = new THREE.Group();
   for (let x = -8; x < STAGE_END + 16; x += 1.6 + rng() * 1.8) {
-    trees.add(tree(rng, x + rng() * 0.8, BELT_FAR - 1.2 - rng() * 7, rng() < 0.5 ? 'pine' : 'round'));
+    trees.add(tree(rng, x + rng() * 0.8, BELT_FAR - 1.2 - rng() * 7,
+      rng() < 0.5 ? 'pine' : 'round', ground));
   }
   // Low bushes on the near side: depth in front of the action without
   // standing in front of it.
-  const bushMat = new THREE.MeshStandardMaterial({ color: '#4d7038', roughness: 1 });
+  const bushMat = new THREE.MeshStandardMaterial({ color: ground.bush, roughness: 1 });
   for (let x = -8; x < STAGE_END + 16; x += 2.4 + rng() * 3.4) {
     const bush = new THREE.Mesh(new THREE.IcosahedronGeometry(0.26 + rng() * 0.22, 0), bushMat);
     bush.position.set(x, 0.2, BELT_NEAR + 0.9 + rng() * 2.6);
@@ -106,7 +125,7 @@ export function buildStage(scene, textures) {
 
   // Grass tufts on the belt itself, low enough to run through.
   const tuftGeo = new THREE.ConeGeometry(0.09, 0.28, 4);
-  const tuftMat = new THREE.MeshStandardMaterial({ color: '#5f7f3c', roughness: 1 });
+  const tuftMat = new THREE.MeshStandardMaterial({ color: ground.tuft, roughness: 1 });
   // Counted from the length rather than fixed, so a longer level is not a
   // sparser one — this was 420 tufts over 106 units of ground.
   const count = Math.round((STAGE_END + 20) * 4);
