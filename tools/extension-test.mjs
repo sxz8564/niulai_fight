@@ -108,6 +108,10 @@ page.on('requestfailed', (r) => errors.push(`request failed ${r.url()}`));
 await page.goto(`chrome-extension://${id}/index.html`, { waitUntil: 'load' });
 // The select screen comes first now, so the harness picks for itself.
 await page.waitForFunction(() => globalThis.__niulaiFight, null, { timeout: 60000 });
+// A fresh profile is a new player, and a new player is taught first. This
+// suite is checking that the extension runs, not that the lesson does, so it
+// declines — the tutorial has its own run in the smoke suite.
+await page.evaluate(() => globalThis.__niulaiFight.setTutorial(false));
 await page.evaluate(() => globalThis.__niulaiFight.choose('niulai'));
 await page.waitForFunction(() => globalThis.__niulaiFight.game, null, { timeout: 60000 });
 check('the game page opens from chrome-extension://', true, page.url().slice(0, 42) + '…');

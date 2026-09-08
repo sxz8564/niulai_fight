@@ -65,6 +65,9 @@ will see and do, not how it is built.
 >
 > How it plays
 >
+> • It teaches you first. The opening minute walks you through every control,
+>   one at a time, and waits for you to do it — then gets out of the way and
+>   does not come back.
 > • Punch, kick, and hold to block. Blocking works against what you are facing
 >   and not against what you are behind, so where you are looking matters.
 > • Step up and down as well as left and right. A wolf standing further up the

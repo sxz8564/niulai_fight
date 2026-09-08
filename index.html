@@ -45,6 +45,27 @@
      screen sitting on top of a running game. */
   #loading[hidden], #banner[hidden], #select[hidden], #bossrow[hidden] { display: none; }
   #paused[hidden] { display: none; }
+  #tip[hidden] { display: none; }
+
+  /* The tutorial prompt. Bottom-centre, where a player looking at their own
+     fighter can read it without leaving him — and above the touch pad, which
+     owns the bottom of the screen on a phone. */
+  #tip { position: fixed; left: 50%; bottom: 40px; transform: translateX(-50%);
+         z-index: 4; max-width: min(90vw, 560px); text-align: center;
+         background: #10141ae6; border: 2px solid #ffd76a; border-radius: 12px;
+         padding: 12px 20px; color: #f4e7cf; pointer-events: none; }
+  #tip b { display: block; font-size: clamp(15px, 2.4vw, 20px); letter-spacing: .04em;
+           line-height: 1.45; }
+  #tip .of { color: #ffd76a; font-size: 12px; letter-spacing: .18em; margin-bottom: 5px; }
+  /* The way out. A button rather than a line of text, because on a phone there
+     is no Escape key to press and a lesson with no exit is a trap. */
+  #tip .skip { pointer-events: auto; margin-top: 8px; background: none;
+               border: 2px solid #39424f; border-radius: 999px; color: #8b95a3;
+               font: inherit; font-size: 12px; letter-spacing: .14em;
+               padding: 5px 14px; cursor: pointer; }
+  #tip .skip:hover, #tip .skip:focus-visible { border-color: #ffd76a; color: #ffd76a;
+                                               outline: none; }
+  @media (hover: none), (pointer: coarse) { #tip { bottom: 172px; } }
 
   /* The three controls a player wants without leaving the fight. The HUD takes
      no pointer events so a tap meant for the pad is never eaten by the score;
@@ -96,14 +117,16 @@
   #select h1 span { color: #ffd76a; }
   #select p { color: #8b95a3; font-size: 15px; letter-spacing: .1em; margin: 0 0 14px; }
   #select .foot { margin-top: 18px; font-size: 13px; }
-  /* The music switch. Small, out of the way of the roster, and readable from
-     across the room because it is the one control on this screen that is not a
+  /* The two switches on the roster screen. Small, out of the way, and readable
+     from across the room because they are the controls here that are not a
      character. */
-  #music { margin-top: 14px; background: none; border: 2px solid #39424f;
-           border-radius: 999px; color: #8b95a3; font: inherit; font-size: 13px;
-           letter-spacing: .16em; padding: 7px 16px; cursor: pointer; }
-  #music:hover, #music:focus-visible { border-color: #ffd76a; color: #ffd76a; outline: none; }
-  #music[aria-pressed="false"] { color: #5d6773; border-color: #2b323c; }
+  .switches { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center;
+              margin-top: 14px; }
+  .switch { background: none; border: 2px solid #39424f;
+            border-radius: 999px; color: #8b95a3; font: inherit; font-size: 13px;
+            letter-spacing: .16em; padding: 7px 16px; cursor: pointer; }
+  .switch:hover, .switch:focus-visible { border-color: #ffd76a; color: #ffd76a; outline: none; }
+  .switch[aria-pressed="false"] { color: #5d6773; border-color: #2b323c; }
   #roster { display: flex; gap: 18px; flex-wrap: wrap; justify-content: center; }
   /* Each card carries its own little renderer, so the roster shows the actual
      models rather than art that could drift from them. */
@@ -182,6 +205,11 @@
 </div>
 
 <div id="banner" hidden></div>
+<div id="tip" hidden>
+  <div class="of"></div>
+  <b></b>
+  <button class="skip" id="tip-skip" type="button">SKIP</button>
+</div>
 <div id="paused" hidden>PAUSED<div class="again">P or ❚❚ to resume</div></div>
 
 <div id="select">
@@ -191,7 +219,10 @@
   <p class="tier">Difficulty</p>
   <div id="levels" role="group" aria-label="Difficulty"></div>
   <p class="foot">1 / 2 or click · then ← → to move, J punch, K kick, L block</p>
-  <button id="music" type="button" aria-pressed="true">♪ MUSIC ON</button>
+  <div class="switches">
+    <button id="music" class="switch" type="button" aria-pressed="true">♪ MUSIC ON</button>
+    <button id="tutorial" class="switch" type="button" aria-pressed="true">? TUTORIAL ON</button>
+  </div>
 </div>
 <div id="loading">LOADING…</div>
 

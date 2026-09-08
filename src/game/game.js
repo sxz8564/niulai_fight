@@ -8,6 +8,7 @@ import { soundBank } from './sound.js';
 import { buildStage, clampToBelt, BELT_NEAR, BELT_FAR, STAGE_START, STAGE_END } from './stage.js';
 import { createInput } from './input.js';
 import { difficultyById, gatesFor } from './difficulty.js';
+import { Tutorial, HOLD_AT } from './tutorial.js';
 
 /*
  * Niulai Fight — a belt-scroller in the shape of the Famicom brawlers: walk
@@ -28,6 +29,14 @@ export class Game {
      * game rather than the shape of it.
      */
     this.difficulty = difficultyById(options.difficulty);
+    /*
+     * Only when it is asked for, which is the first round a new player plays.
+     * A returning player gets no object at all rather than a finished one, so
+     * nothing in the frame has to keep asking whether it is over.
+     */
+    this.tutorial = options.tutorial
+      ? new Tutorial(options.onTutorialDone || (() => {}))
+      : null;
     this.onState = options.onState || (() => {});
     this.enemies = [];
     this.boss = null;
@@ -171,7 +180,11 @@ export class Game {
 
   /** The furthest right the camera — and so the player — may currently go. */
   get boundary() {
-    return this.gate ? this.gate.x : STAGE_END;
+    const gate = this.gate ? this.gate.x : STAGE_END;
+    // The tutorial holds the player short of the first gate. It is the same
+    // wall the gates use, so the lesson happens in a place the player already
+    // understands rather than behind an invisible one.
+    return this.tutorial && this.tutorial.holding ? Math.min(gate, HOLD_AT) : gate;
   }
 
   update(dt) {
@@ -182,6 +195,10 @@ export class Game {
       return;
     }
 
+    // A step changing is worth a repaint of its own: the prompt is state, not
+    // an animation, and anything reading the snapshot should see it turn over
+    // at the moment it does.
+    if (this.tutorial && this.tutorial.update(dt, this)) this.onState(this.snapshot());
     this.drivePlayer(dt);
     this.driveSpawns(dt);
     // The boss is in `enemies` so that the gate counts it, but it is not driven
@@ -596,6 +613,7 @@ export class Game {
       stages: this.gates.length,
       difficulty: this.difficulty.id,
       difficultyName: this.difficulty.name,
+      tutorial: this.tutorial ? this.tutorial.state() : null,
       over: this.over,
       won: this.won,
       cheering: this.over && this.won,

@@ -16,6 +16,9 @@ import { serve } from './serve.mjs';
 
 const require = createRequire(import.meta.url);
 const { chromium } = require('playwright');
+// Read from the game's own module rather than repeated here, so a change to
+// where the tutorial holds the player cannot quietly pass this suite.
+const { HOLD_AT: HOLD } = await import('../src/game/tutorial.js');
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const shots = join(root, '.smoke');
 mkdirSync(shots, { recursive: true });
@@ -63,6 +66,21 @@ page.on('requestfailed', (r) => {
 await page.goto(url, { waitUntil: 'load' });
 // The select screen comes first now, so the harness picks for itself.
 await page.waitForFunction(() => globalThis.__niulaiFight, null, { timeout: 60000 });
+/*
+ * A new player is taught before they are thrown at anything, so the first thing
+ * to establish is that this profile looks like a new player — and then to say
+ * no thank you, because everything after this plays the game rather than the
+ * lesson. The tutorial gets a run of its own at the end.
+ */
+const firstVisit = await page.evaluate(() => ({
+  on: globalThis.__niulaiFight.tutorial,
+  pressed: document.getElementById('tutorial').getAttribute('aria-pressed'),
+  label: document.getElementById('tutorial').textContent
+}));
+check('a new player is offered the tutorial', firstVisit.on === true && firstVisit.pressed === 'true',
+  firstVisit.label);
+await page.evaluate(() => globalThis.__niulaiFight.setTutorial(false));
+
 /*
  * The roster listens on the window for Enter and for digits, and the difficulty
  * row is on the same screen. A player tabbing to HARD and pressing it must get
@@ -1950,6 +1968,172 @@ check('the Cart at the end of it is tougher too', cart.health > cart.registry,
 
 // Left as it was found, so a player who ran the suite is not quietly on Hard.
 await api(() => globalThis.__niulaiFight.setDifficulty('easy'));
+
+/* ------------------------------------------------------------ the tutorial --
+ *
+ * Six prompts that will not go away until the thing they name has happened. It
+ * is driven here the way a player drives it — by pressing keys and watching the
+ * world — because a step that advances on anything other than the player doing
+ * it is not teaching anybody anything.
+ */
+const teach = () => api(() => {
+  const g = globalThis.__niulaiFight.game;
+  const state = g.snapshot().tutorial;
+  return {
+    text: state ? state.text : null,
+    lesson: state ? state.lesson : null,
+    lessons: state ? state.lessons : null,
+    card: document.querySelector('#tip b').textContent,
+    shown: !document.getElementById('tip').hidden,
+    boundary: g.boundary,
+    finished: g.tutorial ? g.tutorial.finished : null,
+    enemies: g.enemies.length,
+    x: g.player.position.x
+  };
+});
+/** Holds an action for a while, the way a hand does. */
+const doAction = (action, seconds) => api(([act, secs]) => {
+  globalThis.__niulaiFight.press(act);
+  globalThis.__niulaiFight.step(secs);
+  globalThis.__niulaiFight.release(act);
+}, [action, seconds]);
+
+await api(() => globalThis.__niulaiFight.setTutorial(true));
+await api(() => { globalThis.__niulaiFight.game.__previous = true; });
+await page.click('#t-restart');
+await page.waitForFunction(() => globalThis.__niulaiFight.game &&
+  !globalThis.__niulaiFight.game.__previous, null, { timeout: 120000 });
+await api(() => globalThis.__niulaiFight.stop());
+
+const lesson1 = await teach();
+check('turning the tutorial on teaches the next round', lesson1.lesson === 1 && lesson1.shown,
+  `${lesson1.card} (${lesson1.lesson}/${lesson1.lessons})`);
+check('and the prompt on screen is the one the game is asking for',
+  lesson1.card === lesson1.text, `${lesson1.card} against ${lesson1.text}`);
+
+/*
+ * The wall. A player learning which key punches should not be doing it with two
+ * wolves on them, so the first gate is out of reach until the lesson is over —
+ * and the gate's wave triggers six units short of the gate itself, which is
+ * what the hold has to stay behind.
+ */
+await doAction('right', 6);
+const walled = await teach();
+check('the first wave cannot arrive during the lesson',
+  walled.enemies === 0 && walled.x <= walled.boundary + 0.01,
+  `held at ${walled.x.toFixed(2)}, ${walled.enemies} wolves`);
+
+/* Walking right was step one, so that much is already done. */
+check('walking is what finishes the walking step', walled.lesson === 2, `${walled.card}`);
+
+/* And a step does not take just any key: a punch is not a step to the left. */
+await doAction('punch', 0.6);
+const wrongKey = await teach();
+check('the wrong key does not move it on', wrongKey.lesson === 2, wrongKey.card);
+
+await doAction('left', 1.6);
+const afterLeft = await teach();
+check('walking back finishes the second', afterLeft.lesson === 3, afterLeft.card);
+
+await doAction('up', 1.2);
+const afterLane = await teach();
+check('stepping off the line finishes the third', afterLane.lesson === 4, afterLane.card);
+
+await doAction('punch', 0.6);
+const afterPunch = await teach();
+check('a punch finishes the punch step', afterPunch.lesson === 5, afterPunch.card);
+
+await doAction('kick', 0.7);
+const afterKick = await teach();
+check('a kick finishes the kick step', afterKick.lesson === 6, afterKick.card);
+
+/* Block is held rather than tapped, and the step is timed to match: a player
+ * who taps it has not learned the thing the step is for. */
+await doAction('block', 0.2);
+const tapped = await teach();
+await doAction('block', 0.8);
+const heldDown = await teach();
+check('block has to be held, not tapped', tapped.lesson === 6 && heldDown.lesson === null,
+  `tapped: ${tapped.lesson}/6, held: ${heldDown.card}`);
+check('the send-off takes the wall down with it', heldDown.boundary > HOLD + 1,
+  `boundary ${heldDown.boundary}`);
+await page.screenshot({ path: join(shots, '7-tutorial.png'), animations: 'disabled' });
+
+await api(() => globalThis.__niulaiFight.step(4));
+const taught = await api(() => ({
+  finished: globalThis.__niulaiFight.game.tutorial.finished,
+  gone: document.getElementById('tip').hidden,
+  saved: localStorage.getItem('niulai-fight.tutorial'),
+  pressed: document.getElementById('tutorial').getAttribute('aria-pressed')
+}));
+check('it ends by itself, and takes its prompt off the screen',
+  taught.finished && taught.gone, `finished ${taught.finished}, card gone ${taught.gone}`);
+check('and it does not ask again next time',
+  taught.saved === 'off' && taught.pressed === 'false',
+  `saved ${taught.saved}, switch ${taught.pressed}`);
+
+/* The world is a normal one again once it is over. */
+await doAction('right', 5);
+const playing = await teach();
+check('the game it hands back is the ordinary one', playing.enemies > 0,
+  `${playing.enemies} wolves at x=${playing.x.toFixed(1)}`);
+
+/*
+ * Every prompt twice. "Press J" is no help to a thumb, and the pad is what a
+ * phone actually has, so each lesson carries a wording for either hand.
+ */
+const wording = await api(async () => {
+  const module = await import('/src/game/tutorial.js');
+  return module.steps();
+});
+const lessons = wording.filter((step) => !step.free);
+const keyboardOnly = /→|←|↑|↓|Space|Shift/;
+check('every lesson is worded for a keyboard and for a thumb',
+  lessons.length === 6 && lessons.every((step) => step.touch !== step.text) &&
+  lessons.every((step) => keyboardOnly.test(step.text) || /J|K|L/.test(step.text)) &&
+  !lessons.some((step) => keyboardOnly.test(step.touch)),
+  lessons.map((step) => step.touch).join(' · '));
+
+/* And the way out, for a player who does not want to be taught. */
+await api(() => globalThis.__niulaiFight.setTutorial(true));
+await api(() => { globalThis.__niulaiFight.game.__previous = true; });
+await page.click('#t-restart');
+await page.waitForFunction(() => globalThis.__niulaiFight.game &&
+  !globalThis.__niulaiFight.game.__previous, null, { timeout: 120000 });
+await api(() => globalThis.__niulaiFight.stop());
+const beforeEscape = await teach();
+await page.keyboard.press('Escape');
+await api(() => globalThis.__niulaiFight.step(0.1));
+const skipped = await api(() => ({
+  finished: globalThis.__niulaiFight.game.tutorial.finished,
+  gone: document.getElementById('tip').hidden,
+  saved: localStorage.getItem('niulai-fight.tutorial'),
+  boundary: globalThis.__niulaiFight.game.boundary
+}));
+check('Escape skips it, and skipping counts as having been taught',
+  beforeEscape.lesson === 1 && skipped.finished && skipped.gone &&
+  skipped.saved === 'off' && skipped.boundary > HOLD + 1,
+  `finished ${skipped.finished}, saved ${skipped.saved}, boundary ${skipped.boundary}`);
+
+/* The same exit, for the hand that has no Escape key. */
+await api(() => globalThis.__niulaiFight.setTutorial(true));
+await api(() => { globalThis.__niulaiFight.game.__previous = true; });
+await page.click('#t-restart');
+await page.waitForFunction(() => globalThis.__niulaiFight.game &&
+  !globalThis.__niulaiFight.game.__previous, null, { timeout: 120000 });
+await api(() => globalThis.__niulaiFight.stop());
+const beforeButton = await teach();
+await page.click('#tip-skip');
+const byButton = await api(() => ({
+  finished: globalThis.__niulaiFight.game.tutorial.finished,
+  gone: document.getElementById('tip').hidden,
+  score: globalThis.__niulaiFight.game.score,
+  over: globalThis.__niulaiFight.game.over
+}));
+check('the SKIP button does it too, without ending the round under it',
+  beforeButton.lesson === 1 && byButton.finished && byButton.gone && !byButton.over,
+  `finished ${byButton.finished}, round over ${byButton.over}`);
+await api(() => globalThis.__niulaiFight.setTutorial(false));
 
 check('still no script errors after playing', errors.length === 0, errors[0] || '');
 

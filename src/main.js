@@ -21,6 +21,19 @@ const selectScreen = document.getElementById('select');
 const roster = document.getElementById('roster');
 const loading = document.getElementById('loading');
 const levels = document.getElementById('levels');
+const tutorialButton = document.getElementById('tutorial');
+const tip = {
+  card: document.getElementById('tip'),
+  text: document.querySelector('#tip b'),
+  of: document.querySelector('#tip .of'),
+  skip: document.getElementById('tip-skip')
+};
+
+/* Which half of every prompt to show. The same condition the stylesheet uses to
+ * put the touch pad on screen, because the pad is what the wording names. */
+const usingTouch = globalThis.matchMedia
+  ? matchMedia('(hover: none), (pointer: coarse)').matches
+  : false;
 
 const hud = {
   health: document.getElementById('health'),
@@ -53,6 +66,17 @@ function paint(state) {
   // something quite different from "3/5" and the player should not have to
   // work out which run they are in.
   hud.difficulty.textContent = state.difficultyName || '';
+
+  /*
+   * The tutorial prompt, painted from the same snapshot as everything else so
+   * it cannot disagree with the game about which step is being asked for.
+   */
+  const teaching = state.tutorial;
+  tip.card.hidden = !teaching;
+  if (teaching) {
+    tip.text.textContent = usingTouch ? teaching.touch : teaching.text;
+    tip.of.textContent = teaching.lesson ? `${teaching.lesson} / ${teaching.lessons}` : '';
+  }
 
   /*
    * The rage meter, and the key that spends it, both appear only for a fighter
@@ -179,6 +203,28 @@ function setDifficulty(id) {
 setDifficulty(difficulty);
 
 /*
+ * The tutorial. On for a new player and off ever after — it is a thing you do
+ * once, and a game that offers to teach you again every time you open it is
+ * calling you a beginner. Finishing it and skipping it end the same way, since
+ * a player who says they do not need it has said so.
+ */
+const TUTORIAL_KEY = 'niulai-fight.tutorial';
+let tutorialOn = true;
+try {
+  tutorialOn = localStorage.getItem(TUTORIAL_KEY) !== 'off';
+} catch { /* private mode: teach them, it costs one round */ }
+
+function setTutorial(on) {
+  tutorialOn = Boolean(on);
+  tutorialButton.textContent = tutorialOn ? '? TUTORIAL ON' : '? TUTORIAL OFF';
+  tutorialButton.setAttribute('aria-pressed', String(tutorialOn));
+  try { localStorage.setItem(TUTORIAL_KEY, tutorialOn ? 'on' : 'off'); } catch { /* ignore */ }
+  return tutorialOn;
+}
+setTutorial(tutorialOn);
+tutorialButton.addEventListener('click', () => setTutorial(!tutorialOn));
+
+/*
  * In-game controls. Wired once, like the roster's switch, because they are part
  * of the page rather than of the round — a listener added per round would fire
  * twice on the second one. What they act on is the round that happens to be
@@ -186,6 +232,7 @@ setDifficulty(difficulty);
  */
 let paused = false;
 let endRound = null;
+let currentGame = null;
 
 function setPaused(on) {
   paused = Boolean(on) && Boolean(endRound);
@@ -207,10 +254,26 @@ tools.restart.addEventListener('click', () => {
 });
 window.addEventListener('keydown', (event) => {
   // Only while a round is actually running: P on the roster should do nothing.
-  if (!endRound || event.key.toLowerCase() !== 'p') return;
-  event.preventDefault();
-  setPaused(!paused);
+  if (!endRound) return;
+  const key = event.key.toLowerCase();
+  if (key === 'p') {
+    event.preventDefault();
+    setPaused(!paused);
+  } else if (key === 'escape') {
+    // Only while it is running, so Escape still belongs to the end-of-round
+    // menu the moment there is one.
+    if (skipTutorial()) event.preventDefault();
+  }
 });
+
+/** Ends the lesson early, from the button or from the key. */
+function skipTutorial() {
+  if (!currentGame || !currentGame.tutorial || currentGame.tutorial.finished) return false;
+  currentGame.tutorial.skip();
+  paint(currentGame.snapshot());
+  return true;
+}
+tip.skip.addEventListener('click', () => skipTutorial());
 
 /* The harness needs a handle before a human has chosen anything — and the
  * sound bank outlives every round, so it hangs here rather than off the game. */
@@ -219,7 +282,9 @@ globalThis.__niulaiFight = {
   sounds,
   choose(id) { if (offerChoice) offerChoice(id); },
   get difficulty() { return difficulty; },
-  setDifficulty(id) { return setDifficulty(id); }
+  setDifficulty(id) { return setDifficulty(id); },
+  get tutorial() { return tutorialOn; },
+  setTutorial(on) { return setTutorial(on); }
 };
 
 /** Shows the select screen and resolves with the chosen character's id. */
@@ -257,7 +322,15 @@ async function playRound(playerId) {
   loading.hidden = false;
   hud.banner.hidden = true;
 
-  const game = new Game(canvas, { onState: paint, playerId, difficulty });
+  const game = new Game(canvas, {
+    onState: paint, playerId, difficulty,
+    tutorial: tutorialOn,
+    // Finished or skipped, it does not come back. Written the moment it ends
+    // rather than when the round does, so quitting halfway through the round
+    // still counts as having been taught.
+    onTutorialDone: () => setTutorial(false)
+  });
+  currentGame = game;
 
   function fit() {
     game.resize(canvas.clientWidth || window.innerWidth, canvas.clientHeight || window.innerHeight);
@@ -338,6 +411,8 @@ async function playRound(playerId) {
   });
 
   cancelAnimationFrame(raf);
+  currentGame = null;
+  tip.card.hidden = true;
   window.removeEventListener('resize', fit);
   hud.banner.hidden = true;
   game.dispose();

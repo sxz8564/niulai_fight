@@ -47,6 +47,35 @@ Stepping up and down is not decoration. An attack only lands if you are close
 in X *and* nearly level in Z, so a wolf standing a metre upstage cannot hit you
 and you cannot hit it. Circling is how you fight three at once.
 
+## The first two minutes
+
+A new player gets a lesson, and gets it once. Six prompts, one at a time, each
+naming a control and waiting until the thing it names has actually happened —
+walk right, walk back, step off the line, punch, kick, hold a block — then a
+send-off and the game proper. The switch on the roster screen turns it on and
+off, it is on for anyone who has not played before, and finishing it (or
+pressing SKIP, which counts the same) turns it off for good.
+
+Two things make it work rather than being a wall of text with an OK button.
+
+**It watches the world, not the keyboard.** A step is finished when the fighter
+has moved, or is mid-swing, or has been behind a guard for half a second — never
+when a key went down. That is what lets the same six lessons be driven from the
+touch pad on a phone, where no key is pressed at all, and it is why the block
+step cannot be satisfied by tapping: it is measured in seconds, because holding
+is the thing being taught.
+
+**The wolves cannot arrive during it.** The first wave triggers six units short
+of its gate, so the lesson holds the player at `HOLD_AT` — nearer than that —
+using the same boundary the gates use. Learning which key punches is not
+something to be doing with two wolves already on you. The wall comes down on the
+send-off, which is why that step exists at all.
+
+Every prompt is written twice, for a keyboard and for a thumb: `Punch — J or
+Space` against `Punch — tap P`. `src/game/tutorial.js` holds the table and the
+state machine; the game only asks it to update and puts what it returns in the
+snapshot.
+
 ## Difficulty
 
 Three of them, under the roster, remembered between visits.
@@ -520,6 +549,7 @@ src/
     ├── actor.js       rigged models, props, and the placeholder body
     ├── stage.js       ground, trees, the painted backdrop
     ├── difficulty.js  the three settings, and the gates each one builds
+    ├── tutorial.js    the six lessons, and what finishes each of them
     └── input.js       keyboard and touch
 ```
 
