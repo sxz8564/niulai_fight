@@ -2,6 +2,7 @@ import { Game } from './game/game.js';
 import { chooseCharacter } from './select.js';
 import { soundBank } from './game/sound.js';
 import { DIFFICULTIES, difficultyById } from './game/difficulty.js';
+import { board, savedName, tidyName, sameRun } from './game/scores.js';
 
 /*
  * Bootstrap: choose a fighter, play a round, offer another.
@@ -24,6 +25,16 @@ const levels = document.getElementById('levels');
 const tutorialButton = document.getElementById('tutorial');
 const endlessButton = document.getElementById('endless');
 const scenes = document.getElementById('scenes');
+const over = {
+  card: document.getElementById('over'),
+  score: document.getElementById('finalscore'),
+  rank: document.getElementById('finalrank'),
+  form: document.getElementById('signature'),
+  name: document.getElementById('yourname'),
+  save: document.getElementById('save'),
+  where: document.getElementById('boardwhere'),
+  ranks: document.getElementById('ranks')
+};
 const tip = {
   card: document.getElementById('tip'),
   text: document.querySelector('#tip b'),
@@ -136,17 +147,29 @@ function paint(state) {
     hud.bossRow.classList.toggle('winding', winding);
   }
 
+  /*
+   * The board comes up once, on the frame the run ends, and stays until the
+   * next round clears it. Painted from `over` rather than from here on every
+   * frame: it is a screen, not a meter.
+   */
+  if (state.over && !signed) offerRun(state);
+  if (!state.over) hideBoard();
+  over.card.hidden = !boardUp;
+  /*
+   * The touch pad is put away with the run. It does nothing once the fight is
+   * over, it sits exactly where the board does on a phone, and leaving it
+   * there means a thumb reaching for the name box can land on the punch button
+   * behind it.
+   */
+  pad.hidden = Boolean(state.over);
+
   if (state.over) {
     const headline = state.won
       ? `${state.playerNameChinese || ''}赢了 · ${(state.playerName || '').toUpperCase()} WINS`.trim()
       : 'GAME OVER';
-    hud.banner.innerHTML = '';
-    const big = document.createElement('div');
-    big.textContent = headline;
-    const small = document.createElement('div');
-    small.className = 'again';
-    small.textContent = 'R  play again      ·      C  choose a fighter';
-    hud.banner.append(big, small);
+    // Just the headline: the two keys are printed at the bottom of the board,
+    // and saying them twice on one screen is noise.
+    hud.banner.textContent = headline;
     hud.banner.classList.toggle('won', Boolean(state.won));
     hud.banner.hidden = false;
   } else {
@@ -167,6 +190,7 @@ const tools = {
   restart: document.getElementById('t-restart')
 };
 const pausedScreen = document.getElementById('paused');
+const pad = document.getElementById('pad');
 
 /* Two switches for one setting: the roster's and the one in the fight. Both are
  * painted from the same state so neither can disagree with what you can hear. */
@@ -217,6 +241,152 @@ function setDifficulty(id) {
   return difficulty;
 }
 setDifficulty(difficulty);
+
+/*
+ * The end of a run: what it was worth, where that puts it, and the board.
+ *
+ * Everything here hangs off one adapter, so the day there is a server the only
+ * thing that changes is which board this is. The screen never assumes the board
+ * is the world's — it prints what the board says it is.
+ */
+const ranking = board();
+/* The two keys are no use to a thumb; on a phone the whole screen outside the
+ * card is the play-again button, so that is what it says. */
+document.querySelector('#over .again').textContent = usingTouch
+  ? 'TAP OUTSIDE TO PLAY AGAIN'
+  : 'R play again · C choose a fighter';
+let signed = null;      // the run being offered to the board, until it is saved
+let boardUp = false;    // whether the card is on screen yet
+let boardTimer = 0;
+
+/*
+ * A loss has nothing to look at, so the board comes straight up. A win has a
+ * hero doing backflips in the middle of the picture, and dropping a table of
+ * numbers over him the instant he lands is a poor way to congratulate anyone.
+ * The celebration loops for ever, so the wait costs nothing.
+ */
+const CELEBRATE = 2600;
+
+function showBoard(run, after) {
+  clearTimeout(boardTimer);
+  boardTimer = setTimeout(() => {
+    // The round can end and be restarted inside the pause; only the run this
+    // timer was started for is allowed to put the card up. It puts it up
+    // itself rather than waiting for the next frame to notice, because the
+    // frame is not guaranteed to be running — a paused round still ends.
+    if (!signed || signed.run !== run) return;
+    boardUp = true;
+    over.card.hidden = false;
+  }, after);
+}
+
+function hideBoard() {
+  clearTimeout(boardTimer);
+  boardUp = false;
+  over.card.hidden = true;
+}
+
+/** One row: place, name, points, and enough of the run to mean something. */
+function rankRow(entry, place, mine) {
+  const row = document.createElement('li');
+  if (mine) row.className = 'you';
+  const at = document.createElement('span');
+  at.className = 'at';
+  at.textContent = `${place}.`;
+  const who = document.createElement('span');
+  who.className = 'who';
+  who.textContent = entry.name || 'ANON';
+  const run = document.createElement('span');
+  run.className = 'run';
+  run.textContent = [entry.difficulty && entry.difficulty.toUpperCase(),
+    entry.endless ? `∞ ${entry.stage}` : `STAGE ${entry.stage}`]
+    .filter(Boolean).join(' · ');
+  const pts = document.createElement('span');
+  pts.className = 'pts';
+  pts.textContent = String(entry.score).padStart(6, '0');
+  row.append(at, who, run, pts);
+  return row;
+}
+
+/**
+ * Draws the board with this run in its place.
+ *
+ * The run is shown whether or not it has been saved, because a rank nobody can
+ * see until they commit to it is not an answer to "how did I do" — and if it
+ * lands outside the ten on screen, it is stitched on under a gap rather than
+ * left off.
+ */
+async function paintBoard(run, place) {
+  const top = await ranking.top(10);
+  over.where.textContent =
+    `RANKING 排行榜 · ${ranking.where}${ranking.whereChinese ? ` ${ranking.whereChinese}` : ''}`;
+  over.ranks.innerHTML = '';
+
+  const mineOf = (entry) => sameRun(entry, run) ||
+    Boolean(signed && signed.entry && sameRun(entry, signed.entry));
+  const shown = top.some(mineOf);
+  top.forEach((entry, i) => over.ranks.append(rankRow(entry, i + 1, mineOf(entry))));
+  if (!shown) {
+    if (top.length) {
+      const gap = document.createElement('li');
+      gap.className = 'gap';
+      gap.textContent = '·  ·  ·';
+      over.ranks.append(gap);
+    }
+    over.ranks.append(rankRow(run, place, true));
+  }
+}
+
+/** Offers the finished run to the board, and shows where it stands. */
+async function offerRun(state) {
+  const run = {
+    name: savedName(),
+    score: state.score,
+    stage: state.stage,
+    fighter: state.player,
+    difficulty: state.difficulty,
+    endless: Boolean(!state.stages),
+    won: Boolean(state.won),
+    at: Date.now()
+  };
+  signed = { run, saved: false, entry: null };
+  over.score.textContent = String(run.score).padStart(6, '0');
+  over.name.value = run.name;
+  over.name.disabled = false;
+  over.save.disabled = false;
+  over.save.textContent = 'SAVE';
+
+  const { rank, total } = await ranking.standing(run);
+  // A round that ended while this one was still being drawn has moved on.
+  if (!signed || signed.run !== run) return;
+  over.rank.textContent = `RANK ${rank} OF ${total}`;
+  await paintBoard(run, rank);
+  showBoard(run, run.won ? CELEBRATE : 0);
+}
+
+/*
+ * Saving. The name is optional — the board takes ANON — and the whole point of
+ * the button is that nothing leaves the run until somebody presses it.
+ */
+over.form.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  if (!signed || signed.saved) return;
+  signed.saved = true;
+  over.name.disabled = true;
+  over.save.disabled = true;
+  const result = await ranking.submit({ ...signed.run, name: tidyName(over.name.value) });
+  signed.entry = result.entry;
+  over.save.textContent = 'SAVED';
+  over.rank.textContent = `RANK ${result.rank} OF ${result.total}`;
+  await paintBoard(result.entry, result.rank);
+});
+
+/*
+ * The two ways this screen could throw the run away by accident. A tap anywhere
+ * plays again and R restarts, and both of those are perfectly reasonable until
+ * somebody is typing their name into the middle of them.
+ */
+over.card.addEventListener('pointerdown', (event) => event.stopPropagation());
 
 /*
  * The backdrop, and whether the level ever ends. Both are chosen here and read
@@ -411,6 +581,8 @@ async function playRound(playerId) {
     onTutorialDone: () => setTutorial(false)
   });
   currentGame = game;
+  signed = null;          // this round's run has not happened yet
+  hideBoard();
 
   function fit() {
     game.resize(canvas.clientWidth || window.innerWidth, canvas.clientHeight || window.innerHeight);
@@ -477,6 +649,12 @@ async function playRound(playerId) {
     }
     function onKey(event) {
       if (!game.over) return;
+      /*
+       * R plays again and Enter plays again — both perfectly reasonable until
+       * somebody is typing REN or RACHEL into the name box in the middle of
+       * them. A keystroke aimed at a text field belongs to that field.
+       */
+      if (event.target && event.target.closest && event.target.closest('#over')) return;
       const key = event.key.toLowerCase();
       if (key === 'r' || key === 'enter') { event.preventDefault(); finish('again'); }
       else if (key === 'c' || key === 'escape') { event.preventDefault(); finish('select'); }
@@ -494,6 +672,7 @@ async function playRound(playerId) {
   currentGame = null;
   tip.card.hidden = true;
   hud.loop.hidden = true;
+  hideBoard();
   window.removeEventListener('resize', fit);
   hud.banner.hidden = true;
   game.dispose();

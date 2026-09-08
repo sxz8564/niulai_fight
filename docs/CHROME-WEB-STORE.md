@@ -83,6 +83,9 @@ will see and do, not how it is built.
 >   three at once.
 > • Lose all your health and you go down. Lose three times and it is over, and
 >   one key starts you again.
+> • Every run ends on a board. Put a name to it if you want one, and see where
+>   it stands against every run you have finished. It is your board, on your
+>   machine, and nothing about it goes anywhere.
 >
 > And at the end, the Cart 木车
 >
@@ -153,8 +156,12 @@ no `permissions` and no `host_permissions`. If the form insists on something:
 > fetched at runtime.
 
 **Data usage** — leave every collected-data category unticked and certify all
-three statements. They are true and testable: the extension has no network
-code, stores nothing, and asks for no identity.
+three statements. The question is about data you *collect*: the extension has
+no network code at all, so nothing it remembers can reach you or anyone else.
+What it does remember — the settings, and the ranking board with whatever name
+the player typed into it — is written to that browser's own storage and never
+leaves the machine. `PRIVACY.md` says exactly that, in those words, so the
+policy and the form agree.
 
 ## URLs
 

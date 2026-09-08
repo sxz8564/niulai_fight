@@ -47,6 +47,48 @@
   #paused[hidden] { display: none; }
   #tip[hidden] { display: none; }
   #loop[hidden] { display: none; }
+  #over[hidden] { display: none; }
+  /* An id rule with `display` in it outranks the browser's own [hidden], so
+     the pad needs to be told twice or it stays on screen under the board. */
+  #pad[hidden] { display: none; }
+
+  /* The end of a run: what it was worth, where that puts you, and the board.
+     Anchored to the bottom rather than the middle, because on a win the middle
+     of the picture has a hero doing backflips in it. */
+  #over { position: fixed; left: 50%; bottom: 3vh; transform: translateX(-50%);
+          z-index: 6; width: min(94vw, 470px); box-sizing: border-box;
+          background: #10141af8; border: 2px solid #ffd76a; border-radius: 14px;
+          padding: 14px 18px 16px; color: #f4e7cf; text-align: center;
+          pointer-events: auto; animation: rise .32s ease-out; }
+  @keyframes rise { from { opacity: 0; transform: translate(-50%, 14px); }
+                    to { opacity: 1; transform: translate(-50%, 0); } }
+  #over .mine { display: flex; gap: 14px; justify-content: center; align-items: baseline;
+                flex-wrap: wrap; margin-bottom: 10px; }
+  #over .mine b { color: #ffd76a; font-size: 26px; letter-spacing: .06em; }
+  #over .mine span { color: #8b95a3; font-size: 12px; letter-spacing: .16em; }
+  #over form { display: flex; gap: 8px; justify-content: center; margin-bottom: 12px; }
+  #over input { flex: 1; min-width: 0; background: #1b2028; border: 2px solid #39424f;
+                border-radius: 8px; color: #f4e7cf; font: inherit; font-size: 14px;
+                letter-spacing: .1em; padding: 7px 10px; text-align: center; }
+  #over input:focus { border-color: #ffd76a; outline: none; }
+  #over form button { background: none; border: 2px solid #39424f; border-radius: 8px;
+                      color: #cdd6e0; font: inherit; font-size: 13px; letter-spacing: .14em;
+                      padding: 7px 14px; cursor: pointer; }
+  #over form button:hover, #over form button:focus-visible { border-color: #ffd76a;
+                                                             color: #ffd76a; outline: none; }
+  #over .where { color: #8b95a3; font-size: 11px; letter-spacing: .18em; margin-bottom: 6px; }
+  #over ol { list-style: none; margin: 0; padding: 0; }
+  #over li { display: flex; gap: 10px; align-items: baseline; font-size: 13px;
+             padding: 3px 6px; border-radius: 6px; }
+  #over li .at { color: #5d6773; width: 2.2em; text-align: right; }
+  #over li .who { flex: 1; text-align: left; overflow: hidden; text-overflow: ellipsis;
+                  white-space: nowrap; }
+  #over li .pts { color: #ffd76a; font-variant-numeric: tabular-nums; }
+  #over li .run { color: #5d6773; font-size: 11px; letter-spacing: .08em; }
+  #over li.you { background: #241f16; color: #ffd76a; }
+  #over li.you .who { color: #ffd76a; }
+  #over li.gap { color: #39424f; justify-content: center; }
+  #over .again { color: #8b95a3; font-size: 12px; letter-spacing: .16em; margin-top: 10px; }
 
   /* The lap counter, for the moment the level starts again under an endless
      run. Big, brief, and out of the way of the fighter. */
@@ -256,6 +298,17 @@
   <button class="skip" id="tip-skip" type="button">SKIP</button>
 </div>
 <div id="loop" hidden></div>
+<div id="over" hidden>
+  <div class="mine"><b id="finalscore">000000</b><span id="finalrank"></span></div>
+  <form id="signature">
+    <input id="yourname" maxlength="12" autocomplete="off" spellcheck="false"
+           placeholder="YOUR NAME (OPTIONAL)" aria-label="Your name, optional">
+    <button type="submit" id="save">SAVE</button>
+  </form>
+  <div class="where" id="boardwhere">RANKING 排行榜</div>
+  <ol id="ranks"></ol>
+  <div class="again">R play again · C choose a fighter</div>
+</div>
 <div id="paused" hidden>PAUSED<div class="again">P or ❚❚ to resume</div></div>
 
 <div id="select">

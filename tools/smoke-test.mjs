@@ -1854,11 +1854,21 @@ const beforeRestart = await api(() => {
   g.onState(g.snapshot());
   return { score: g.score, stage: g.snapshot().stage, firstGateOpened: g.gates[0].opened };
 });
-check('the banner offers a restart when the game is over',
-  await page.evaluate(() => {
-    const banner = document.getElementById('banner');
-    return !banner.hidden && /play again/i.test(banner.textContent);
-  }), 'banner shown');
+/* The headline is the banner's; the two keys moved to the foot of the board
+ * when the board arrived, because saying them twice on one screen is noise. */
+await page.waitForFunction(() => !document.getElementById('over').hidden,
+  null, { timeout: 20000 });
+const lastWords = await page.evaluate(() => {
+  const banner = document.getElementById('banner');
+  const card = document.getElementById('over');
+  return {
+    banner: banner.hidden ? '' : banner.textContent,
+    offer: card.hidden ? '' : card.querySelector('.again').textContent
+  };
+});
+check('the end of a run says so, and says how to start another',
+  /game over/i.test(lastWords.banner) && /play again/i.test(lastWords.offer),
+  `${lastWords.banner} / ${lastWords.offer}`);
 
 await page.keyboard.press('r');
 await page.waitForFunction(() => globalThis.__niulaiFight.game, null, { timeout: 60000 });
@@ -2394,6 +2404,148 @@ const finite = await api(() => {
 check('an ordinary run still ends where it always did',
   finite.over && finite.won && finite.hud === '5/5',
   `${finite.hud}, won ${finite.won}`);
+
+/* ------------------------------------------------------------ the ranking --
+ *
+ * The end of a run: what it was worth, where that puts it, and a board. The
+ * board is this browser's, and the screen has to say so — a table of one
+ * machine's runs presented as the world's would be a lie told in gold letters.
+ */
+await api(() => {
+  localStorage.setItem('niulai-fight.scores', JSON.stringify([
+    { name: 'BIG NIU', score: 9800, stage: 5, difficulty: 'hard', at: 1 },
+    { name: 'XIAO BAO', score: 4200, stage: 3, difficulty: 'easy', at: 2 },
+    { name: 'ANON', score: 900, stage: 2, difficulty: 'easy', at: 3 }
+  ]));
+  localStorage.removeItem('niulai-fight.name');
+});
+await api(() => globalThis.__niulaiFight.setEndless(false));
+await api(() => { globalThis.__niulaiFight.game.__previous = true; });
+await page.click('#t-restart');
+await page.waitForFunction(() => globalThis.__niulaiFight.game &&
+  !globalThis.__niulaiFight.game.__previous, null, { timeout: 120000 });
+await api(() => globalThis.__niulaiFight.stop());
+
+/* Lose one, on purpose, with a score that lands in the middle of the board. */
+await api(() => {
+  const g = globalThis.__niulaiFight.game;
+  g.score = 5100;
+  g.lives = 1;
+  g.player.health = 1;
+  g.player.dead = true;
+  g.player.downTimer = 0;
+  globalThis.__niulaiFight.step(0.3);
+});
+await page.waitForFunction(() => !document.getElementById('over').hidden, null, { timeout: 20000 });
+const ended = await api(() => ({
+  score: document.getElementById('finalscore').textContent,
+  rank: document.getElementById('finalrank').textContent,
+  where: document.getElementById('boardwhere').textContent,
+  rows: [...document.querySelectorAll('#ranks li')].map((li) => ({
+    text: li.textContent, mine: li.classList.contains('you'), gap: li.classList.contains('gap')
+  })),
+  stored: localStorage.getItem('niulai-fight.scores')
+}));
+check('the end of a run shows what it was worth and where that puts it',
+  ended.score === '005100' && ended.rank === 'RANK 2 OF 4', `${ended.score}, ${ended.rank}`);
+check('the board says whose board it is', /THIS DEVICE/.test(ended.where), ended.where);
+check('the run is on it before anyone has typed anything',
+  ended.rows.filter((row) => row.mine).length === 1 && ended.rows.some((row) => row.gap),
+  `${ended.rows.length} rows`);
+check('and nothing is saved until it is asked for',
+  JSON.parse(ended.stored).length === 3, `${JSON.parse(ended.stored).length} rows stored`);
+
+/*
+ * Typing a name. The game's own key map owns A, D, W, S, J, K, L, M, U and the
+ * space bar, and R and Enter play again — every one of which a player is
+ * entitled to put in their name. RACHEL came out as RCHE.
+ */
+await page.click('#yourname');
+await page.keyboard.type('MAD JACK');
+const typed = await api(() => ({
+  value: document.getElementById('yourname').value,
+  playing: Boolean(globalThis.__niulaiFight.game && globalThis.__niulaiFight.game.over),
+  card: !document.getElementById('over').hidden
+}));
+check('the name box gets the whole alphabet, and the keys it shares with the game',
+  typed.value === 'MAD JACK', `typed MAD JACK, got ${typed.value}`);
+check('and typing does not throw the run away', typed.playing && typed.card,
+  typed.card ? 'still on the board' : 'the round restarted underneath it');
+
+/* Enter saves rather than restarting. Waited for as a question rather than as
+ * an assumption: a build where Enter restarts instead should fail this one
+ * check, not hang for twenty seconds and take every check after it down. */
+await page.keyboard.press('Enter');
+const savedInTime = await page
+  .waitForFunction(() => document.getElementById('save').textContent === 'SAVED',
+    null, { timeout: 20000 })
+  .then(() => true).catch(() => false);
+const saved = await api(() => ({
+  rank: document.getElementById('finalrank').textContent,
+  rows: [...document.querySelectorAll('#ranks li')].map((li) => ({
+    text: li.textContent, mine: li.classList.contains('you')
+  })),
+  stored: JSON.parse(localStorage.getItem('niulai-fight.scores')),
+  remembered: localStorage.getItem('niulai-fight.name'),
+  over: globalThis.__niulaiFight.game.over
+}));
+check('saving puts the run on the board under the name given',
+  saved.stored.length === 4 && saved.stored.some((row) => row.name === 'MAD JACK' && row.score === 5100),
+  saved.stored.map((row) => `${row.name} ${row.score}`).join(', '));
+check('it lands in the right place, once',
+  saved.rank === 'RANK 2 OF 4' && saved.rows.filter((row) => row.mine).length === 1 &&
+  saved.rows[1].mine && /MAD JACK/.test(saved.rows[1].text),
+  `${saved.rank}, ${saved.rows.filter((row) => row.mine).length} rows marked as mine`);
+check('and the name is remembered so nobody types it twice',
+  saved.remembered === 'MAD JACK', saved.remembered);
+check('Enter in the name box saves rather than starting a new round',
+  savedInTime && saved.over === true,
+  savedInTime ? 'saved' : 'the run was gone before it could be saved');
+await page.screenshot({ path: join(shots, '8-ranking.png'), animations: 'disabled' });
+
+/*
+ * A second save must not put the same run on twice. The button disables itself,
+ * which is the part a player meets — and the submit handler refuses anyway,
+ * which is the part that holds when the form is submitted some other way.
+ */
+const twice = await api(async () => {
+  const shut = document.getElementById('save').disabled &&
+    document.getElementById('yourname').disabled;
+  document.getElementById('signature')
+    .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+  await new Promise((resolve) => setTimeout(resolve, 150));
+  return { shut, rows: JSON.parse(localStorage.getItem('niulai-fight.scores')).length };
+});
+check('and saving twice does not enter the same run twice',
+  twice.shut && twice.rows === 4, `${twice.rows} rows, box ${twice.shut ? 'shut' : 'still open'}`);
+
+/* A tap on the card is not a tap on the world behind it. Tolerant of the card
+ * not being there at all, so a build that lost it fails the check below rather
+ * than hanging on a click that will never land. */
+await page.click('#boardwhere', { timeout: 5000 }).catch(() => {});
+await page.waitForTimeout(200);
+const untouched = await api(() => ({
+  over: Boolean(globalThis.__niulaiFight.game && globalThis.__niulaiFight.game.over),
+  card: !document.getElementById('over').hidden
+}));
+check('and a tap on the board does not play again under it',
+  untouched.over && untouched.card,
+  untouched.card ? 'the board is still up' : 'the round restarted');
+
+/* The pad goes away with the run: it does nothing once the fight is over, and
+ * on a phone it sits exactly where the board does. */
+check('the touch pad is put away with the run',
+  await page.evaluate(() => document.getElementById('pad').hidden));
+
+/* The next round starts with a clean card and its own run. */
+await api(() => { globalThis.__niulaiFight.game.__previous = true; });
+await page.keyboard.press('r');
+await page.waitForFunction(() => globalThis.__niulaiFight.game &&
+  !globalThis.__niulaiFight.game.__previous, null, { timeout: 120000 });
+await api(() => globalThis.__niulaiFight.stop());
+check('a new round puts the board away and gives the pad back',
+  await page.evaluate(() => document.getElementById('over').hidden &&
+    !document.getElementById('pad').hidden));
 
 check('still no script errors after playing', errors.length === 0, errors[0] || '');
 

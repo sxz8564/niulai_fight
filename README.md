@@ -139,6 +139,30 @@ painting is 39 units wide. That number now comes from the image. It used to be
 27.7, which squeezed 16:9 into 5:4 and left every tree in the distance slightly
 too narrow for its height — nothing in the game said so, it just looked wrong.
 
+## The board
+
+Every run ends on one: what it scored, where that puts it, and the ten best
+runs this browser has finished. A name is optional and nothing is saved until
+somebody presses the button — the run appears in its place on the board either
+way, because a rank you cannot see until you commit to it is not an answer to
+"how did I do".
+
+**It is this browser's board, and the screen says so** — `RANKING 排行榜 · ON
+THIS DEVICE 本机`. A table of one machine's runs presented as the world's would
+be a lie told in gold letters. `src/game/scores.js` is two operations wide —
+put a run on, read it back in order — so the day there is a server to talk to,
+the adapter changes and nothing above it does. That day also needs an origin in
+`host_permissions`, a privacy policy that describes what is collected, and a
+store listing that agrees with both, which is why it is not today.
+
+Two things went wrong on the way and both are worth knowing about. The game's
+key map owns A, D, W, S, J, K, L, M, U and the space bar, and it called
+`preventDefault` on all of them — so typing RACHEL into the name box produced
+RCHE. A keystroke aimed at a text field is not a game input, and `input.js` now
+says so. And R plays again, Enter plays again, and a tap anywhere plays again,
+all of which are reasonable until somebody is typing a name in the middle of
+them; the board swallows its own clicks and keys.
+
 ## Infinite mode
 
 A switch on the roster screen. Clear the last stage and the level starts again
@@ -609,6 +633,7 @@ src/
     ├── stage.js       ground, trees, the painted backdrop and its palette
     ├── difficulty.js  the three settings, and the gates each one builds
     ├── tutorial.js    the six lessons, and what finishes each of them
+    ├── scores.js      the ranking board, and the seam a server would go through
     └── input.js       keyboard and touch
 ```
 

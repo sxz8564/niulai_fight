@@ -26,6 +26,17 @@ export function createInput(target = window) {
   const pressed = new Set();
 
   function down(event) {
+    /*
+     * A keystroke aimed at a text field is not a game input. The name box at
+     * the end of a run wants the whole alphabet, and this map owns A, D, W, S,
+     * J, K, L, M, U and the space bar — typing RACHEL into it produced RCHE,
+     * because three of those letters were being swallowed and preventDefault'd
+     * before the field ever saw them.
+     */
+    const target = event.target;
+    if (target && target.closest && target.closest('input, textarea, select, [contenteditable]')) {
+      return;
+    }
     const action = KEYS[event.code];
     if (!action) return;
     // Space and the arrows scroll the page otherwise, which is disorienting
