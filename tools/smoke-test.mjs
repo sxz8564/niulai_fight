@@ -2135,6 +2135,194 @@ check('the SKIP button does it too, without ending the round under it',
   `finished ${byButton.finished}, round over ${byButton.over}`);
 await api(() => globalThis.__niulaiFight.setTutorial(false));
 
+/* ---------------------------------------------------------- the backdrops --
+ *
+ * Seven paintings out of the filter, and the two things the game has to get
+ * right about whichever one is chosen: its proportions, and the colour of the
+ * air in front of it.
+ */
+const gallery = await api(async () => {
+  const registry = await fetch('assets/scenes/index.json').then((r) => r.json());
+  return registry.map((scene) => ({ ...scene, sane: /^#[0-9a-f]{6}$/i.test(scene.sky || '') }));
+});
+check('every backdrop the filter paints is on offer',
+  gallery.length >= 7 && gallery.every((s) => s.file && s.thumb && s.sane),
+  gallery.map((s) => s.id).join(', '));
+const tiles = await page.$$eval('#scenes button', (buttons) => buttons.map((button) => ({
+  id: button.dataset.scene,
+  thumb: (button.querySelector('img') || {}).src || ''
+})));
+check('and the roster shows every one of them, as a picture rather than a name',
+  tiles.length === gallery.length &&
+  tiles.every((tile, i) => tile.id === gallery[i].id && tile.thumb.includes(gallery[i].thumb)),
+  `${tiles.length} tiles`);
+
+/* What the orchard is lit like, to compare a night scene against. */
+const day = await api(() => {
+  const g = globalThis.__niulaiFight.game;
+  let light = 0;
+  g.scene.traverse((node) => { if (node.isLight) light += node.intensity; });
+  return { id: g.background.id, light };
+});
+
+/*
+ * The proportions. A 16:9 painting was being drawn into a 5:4 tile, which left
+ * every tree in the distance too narrow for its height — nothing in the game
+ * said so, it just looked slightly wrong. The tile has to carry the image's own
+ * aspect, whatever image it is.
+ */
+const drawn = await api(() => {
+  const g = globalThis.__niulaiFight.game;
+  let found = null;
+  g.scene.traverse((node) => {
+    if (found || !node.isMesh || !node.material || !node.material.map) return;
+    const map = node.material.map;
+    if (!map.image || !node.geometry.parameters || !node.geometry.parameters.height) return;
+    found = {
+      tile: node.geometry.parameters.width / map.repeat.x,
+      height: node.geometry.parameters.height,
+      image: map.image.width / map.image.height,
+      src: (map.image.currentSrc || map.image.src || '').split('/').pop()
+    };
+  });
+  return found;
+});
+const painted = drawn ? (drawn.tile / drawn.height) : 0;
+check('a backdrop is drawn at the shape it was painted at',
+  drawn && Math.abs(painted - drawn.image) / drawn.image < 0.08,
+  drawn ? `${painted.toFixed(2)} against ${drawn.image.toFixed(2)} (${drawn.src})` : 'no backdrop');
+
+/* And the air in front of it. */
+await api(() => globalThis.__niulaiFight.setBackground('lantern-night'));
+await api(() => { globalThis.__niulaiFight.game.__previous = true; });
+await page.click('#t-restart');
+await page.waitForFunction(() => globalThis.__niulaiFight.game &&
+  !globalThis.__niulaiFight.game.__previous, null, { timeout: 120000 });
+await api(() => globalThis.__niulaiFight.stop());
+const night = await api(() => {
+  const g = globalThis.__niulaiFight.game;
+  const lights = [];
+  g.scene.traverse((node) => { if (node.isLight) lights.push(node.intensity); });
+  return {
+    id: g.background.id,
+    sky: g.background.sky,
+    painted: '#' + g.scene.background.getHexString(),
+    fog: '#' + g.scene.fog.color.getHexString(),
+    light: lights.reduce((a, b) => a + b, 0)
+  };
+});
+check('choosing a backdrop is what the round is played against', night.id === 'lantern-night',
+  night.id);
+check('and the air in front of it is the colour of its sky',
+  night.painted === night.sky && night.fog === night.sky,
+  `${night.painted} / ${night.fog} against ${night.sky}`);
+check('a night scene is lit like one', night.light < day.light,
+  `${night.light.toFixed(2)} against ${day.light.toFixed(2)} in the orchard`);
+
+/* -------------------------------------------------------------- the shake --
+ *
+ * Ten animals arriving at a run, in a shot that used to be perfectly steady.
+ */
+const ground = await api(() => {
+  const g = globalThis.__niulaiFight.game;
+  // On their own, in the open, so what moves is the camera and not the fight.
+  for (const enemy of g.enemies) g.scene.remove(enemy.root);
+  g.enemies = []; g.spawnQueue = 0; g.over = false;
+  g.player.position.set(3, 0, 0.2);
+  g.player.health = g.player.maxHealth;
+  g.player.dead = false; g.player.stunTimer = 0; g.player.downTimer = 0;
+  g.player.attackTimer = 0;
+  for (let i = 0; i < 120; i++) globalThis.__niulaiFight.step(1 / 60, 1 / 60);
+  const still = g.camera.position.x;
+
+  g.power.meter = g.power.max;
+  globalThis.__niulaiFight.press('power');
+  let quiet = 0;
+  let shaken = 0;
+  for (let i = 0; i < 150; i++) {
+    globalThis.__niulaiFight.step(1 / 60, 1 / 60);
+    const off = Math.abs(g.camera.position.x - still);
+    if (i < 20) quiet = Math.max(quiet, off);        // the wind-up, before they land
+    else if (i < 70) shaken = Math.max(shaken, off);  // the herd arriving
+  }
+  return { still, quiet, shaken, settled: Math.abs(g.camera.position.x - still), herd: g.power.herd.length };
+});
+check('the herd arriving shakes the camera',
+  ground.herd > 0 && ground.shaken > 0.1 && ground.shaken > ground.quiet * 4,
+  `${ground.shaken.toFixed(3)} of throw against ${ground.quiet.toFixed(3)} during the wind-up`);
+check('and the shot is steady again afterwards', ground.settled < 0.03,
+  `${ground.settled.toFixed(3)} off centre`);
+
+/* ------------------------------------------------------------ round again --
+ *
+ * Infinite mode. The level starts over and nothing else does.
+ */
+await api(() => globalThis.__niulaiFight.setEndless(true));
+await api(() => { globalThis.__niulaiFight.game.__previous = true; });
+await page.click('#t-restart');
+await page.waitForFunction(() => globalThis.__niulaiFight.game &&
+  !globalThis.__niulaiFight.game.__previous, null, { timeout: 120000 });
+await api(() => globalThis.__niulaiFight.stop());
+const wrapped = await api(() => {
+  const g = globalThis.__niulaiFight.game;
+  g.score = 7700;
+  g.lives = 2;
+  g.player.health = 55;
+  g.power.meter = g.power.max * 0.5;
+  // The last gate, cleared.
+  for (const enemy of g.enemies) g.scene.remove(enemy.root);
+  g.enemies = []; g.boss = null; g.spawnQueue = 0;
+  for (const gate of g.gates) gate.opened = true;
+  g.gateIndex = g.gates.length - 1;
+  const before = g.snapshot();
+  globalThis.__niulaiFight.step(0.3);
+  const after = g.snapshot();
+  return {
+    before: { stage: before.stage, stages: before.stages },
+    after,
+    rage: g.power.meter,
+    x: g.player.position.x,
+    shut: g.gates.every((gate) => !gate.opened),
+    hud: document.getElementById('stage').textContent,
+    flash: !document.getElementById('loop').hidden
+  };
+});
+check('clearing the last stage of an endless run does not end it',
+  wrapped.after.over === false && wrapped.after.won === false && wrapped.after.loop === 1,
+  `loop ${wrapped.after.loop}, over ${wrapped.after.over}`);
+check('and nothing the player earned is put back',
+  wrapped.after.score === 7700 && wrapped.after.lives === 2 && wrapped.after.health === 55 &&
+  wrapped.rage > 0,
+  `${wrapped.after.score} points, ${wrapped.after.lives} lives, ${wrapped.after.health} health`);
+check('the stage number keeps counting',
+  wrapped.before.stage === 5 && wrapped.after.stage === 6 && wrapped.hud === '6/∞',
+  `${wrapped.before.stage} -> ${wrapped.hud}`);
+check('the level it starts again is one nobody has fought',
+  wrapped.shut && wrapped.x === 0 && wrapped.flash,
+  wrapped.shut ? `all gates shut, back at ${wrapped.x}` : 'a gate was left open');
+
+/* And with it off, the last stage is still the last one. */
+await api(() => globalThis.__niulaiFight.setEndless(false));
+await api(() => { globalThis.__niulaiFight.game.__previous = true; });
+await page.click('#t-restart');
+await page.waitForFunction(() => globalThis.__niulaiFight.game &&
+  !globalThis.__niulaiFight.game.__previous, null, { timeout: 120000 });
+await api(() => globalThis.__niulaiFight.stop());
+const finite = await api(() => {
+  const g = globalThis.__niulaiFight.game;
+  for (const enemy of g.enemies) g.scene.remove(enemy.root);
+  g.enemies = []; g.boss = null; g.spawnQueue = 0;
+  for (const gate of g.gates) gate.opened = true;
+  g.gateIndex = g.gates.length - 1;
+  globalThis.__niulaiFight.step(0.3);
+  const snap = g.snapshot();
+  return { over: snap.over, won: snap.won, stage: snap.stage, stages: snap.stages,
+           hud: document.getElementById('stage').textContent };
+});
+check('an ordinary run still ends where it always did',
+  finite.over && finite.won && finite.hud === '5/5',
+  `${finite.hud}, won ${finite.won}`);
+
 check('still no script errors after playing', errors.length === 0, errors[0] || '');
 
 if (transients.length) {

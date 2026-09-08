@@ -241,6 +241,12 @@ export class Power {
    */
   release() {
     const { host, spec } = this;
+    /*
+     * The ground goes first. Ten animals arriving at a run is the loudest
+     * thing in the game and it used to happen in a perfectly steady shot —
+     * the shake is what makes the screen agree with the sound.
+     */
+    host.shake(spec.shake || 0.34, spec.shakeFor || 0.9);
     const count = spec.count || 10;
     const lanes = Math.max(1, spec.lanes || 5);
     const near = host.beltNear + LANE_SPILL;

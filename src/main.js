@@ -22,6 +22,8 @@ const roster = document.getElementById('roster');
 const loading = document.getElementById('loading');
 const levels = document.getElementById('levels');
 const tutorialButton = document.getElementById('tutorial');
+const endlessButton = document.getElementById('endless');
+const scenes = document.getElementById('scenes');
 const tip = {
   card: document.getElementById('tip'),
   text: document.querySelector('#tip b'),
@@ -50,7 +52,8 @@ const hud = {
   bossRow: document.getElementById('bossrow'),
   bossName: document.getElementById('bossname'),
   bossHealth: document.getElementById('bosshealth'),
-  difficulty: document.getElementById('difficulty')
+  difficulty: document.getElementById('difficulty'),
+  loop: document.getElementById('loop')
 };
 
 function paint(state) {
@@ -61,7 +64,20 @@ function paint(state) {
   hud.health.classList.toggle('low', state.health <= state.maxHealth * 0.3);
   hud.lives.textContent = '🐮'.repeat(Math.max(0, state.lives));
   hud.score.textContent = String(state.score).padStart(6, '0');
-  hud.stage.textContent = `${state.stage}/${state.stages}`;
+  // An endless run has no total to be a fraction of.
+  hud.stage.textContent = state.stages ? `${state.stage}/${state.stages}` : `${state.stage}/∞`;
+
+  /* The lap, for the moment one ends and the next starts under the player. */
+  const flashing = Boolean(state.loopFlash) && !state.over;
+  hud.loop.hidden = !flashing;
+  if (flashing) {
+    hud.loop.innerHTML = '';
+    const big = document.createElement('div');
+    big.textContent = `LOOP ${state.loop + 1}`;
+    const small = document.createElement('small');
+    small.textContent = 'SAME LIVES · SAME SCORE · KEEP GOING';
+    hud.loop.append(big, small);
+  }
   // Named in the HUD, not just on the screen you chose it from: "3/9" means
   // something quite different from "3/5" and the player should not have to
   // work out which run they are in.
@@ -203,6 +219,66 @@ function setDifficulty(id) {
 setDifficulty(difficulty);
 
 /*
+ * The backdrop, and whether the level ever ends. Both are chosen here and read
+ * when a round starts, so neither can change the world under a fight already
+ * in progress.
+ */
+const SCENE_KEY = 'niulai-fight.background';
+const ENDLESS_KEY = 'niulai-fight.endless';
+let background = 'orchard-day';
+let endless = false;
+try {
+  background = localStorage.getItem(SCENE_KEY) || background;
+  endless = localStorage.getItem(ENDLESS_KEY) === 'on';
+} catch { /* private mode: the default orchard, and a level that ends */ }
+
+const sceneButtons = new Map();
+function setBackground(id) {
+  if (sceneButtons.size && !sceneButtons.has(id)) return background;   // a stale saved id
+  background = id;
+  for (const [key, button] of sceneButtons) {
+    button.setAttribute('aria-pressed', String(key === background));
+  }
+  try { localStorage.setItem(SCENE_KEY, background); } catch { /* ignore */ }
+  return background;
+}
+
+/* Painted from the same registry the game loads, so the roster cannot offer a
+ * backdrop the game does not have. */
+fetch('assets/scenes/index.json').then((r) => r.json()).then((registry) => {
+  for (const scene of registry) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.dataset.scene = scene.id;
+    const image = document.createElement('img');
+    image.src = `assets/scenes/${scene.thumb || scene.file}`;
+    image.alt = '';
+    const name = document.createElement('span');
+    name.className = 'name';
+    name.textContent = scene.name;
+    button.append(image, name);
+    button.title = `${scene.name} ${scene.nameChinese || ''}`.trim();
+    button.addEventListener('click', () => setBackground(scene.id));
+    button.addEventListener('pointerenter', () => sounds.play('select'));
+    scenes.appendChild(button);
+    sceneButtons.set(scene.id, button);
+  }
+  // Re-run now that the buttons exist: this is what lights the saved one, and
+  // what puts a saved id that no longer ships back on the default.
+  setBackground(sceneButtons.has(background) ? background : registry[0].id);
+}).catch(() => { /* no picker; the game still has its default */ });
+
+function setEndless(on) {
+  endless = Boolean(on);
+  endlessButton.textContent = endless ? '∞ INFINITE ON' : '∞ INFINITE OFF';
+  endlessButton.setAttribute('aria-pressed', String(endless));
+  try { localStorage.setItem(ENDLESS_KEY, endless ? 'on' : 'off'); } catch { /* ignore */ }
+  return endless;
+}
+setEndless(endless);
+endlessButton.addEventListener('click', () => setEndless(!endless));
+
+/*
  * The tutorial. On for a new player and off ever after — it is a thing you do
  * once, and a game that offers to teach you again every time you open it is
  * calling you a beginner. Finishing it and skipping it end the same way, since
@@ -284,7 +360,11 @@ globalThis.__niulaiFight = {
   get difficulty() { return difficulty; },
   setDifficulty(id) { return setDifficulty(id); },
   get tutorial() { return tutorialOn; },
-  setTutorial(on) { return setTutorial(on); }
+  setTutorial(on) { return setTutorial(on); },
+  get background() { return background; },
+  setBackground(id) { return setBackground(id); },
+  get endless() { return endless; },
+  setEndless(on) { return setEndless(on); }
 };
 
 /** Shows the select screen and resolves with the chosen character's id. */
@@ -323,7 +403,7 @@ async function playRound(playerId) {
   hud.banner.hidden = true;
 
   const game = new Game(canvas, {
-    onState: paint, playerId, difficulty,
+    onState: paint, playerId, difficulty, background, endless,
     tutorial: tutorialOn,
     // Finished or skipped, it does not come back. Written the moment it ends
     // rather than when the round does, so quitting halfway through the round
@@ -413,6 +493,7 @@ async function playRound(playerId) {
   cancelAnimationFrame(raf);
   currentGame = null;
   tip.card.hidden = true;
+  hud.loop.hidden = true;
   window.removeEventListener('resize', fit);
   hud.banner.hidden = true;
   game.dispose();

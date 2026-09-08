@@ -46,6 +46,16 @@
   #loading[hidden], #banner[hidden], #select[hidden], #bossrow[hidden] { display: none; }
   #paused[hidden] { display: none; }
   #tip[hidden] { display: none; }
+  #loop[hidden] { display: none; }
+
+  /* The lap counter, for the moment the level starts again under an endless
+     run. Big, brief, and out of the way of the fighter. */
+  #loop { position: fixed; left: 50%; top: 22%; transform: translateX(-50%);
+          z-index: 4; color: #ffd76a; font-size: clamp(24px, 5vw, 54px);
+          letter-spacing: .12em; text-align: center; pointer-events: none;
+          text-shadow: 0 4px 0 #000, 0 0 16px rgba(0, 0, 0, .85); }
+  #loop small { display: block; color: #f4e7cf; font-size: 15px; letter-spacing: .2em;
+                margin-top: 6px; }
 
   /* The tutorial prompt. Bottom-centre, where a player looking at their own
      fighter can read it without leaving him — and above the touch pad, which
@@ -110,8 +120,15 @@
   @keyframes tell { 50% { opacity: .35; } }
   #bossrow.winding { animation: tell .18s steps(1) infinite; }
 
-  #select { position: fixed; inset: 0; z-index: 5; display: grid; place-content: center;
-            justify-items: center; gap: 6px; background: #10141a; text-align: center; }
+  /* Scrollable, and only centred while it fits. There is a lot on this screen
+     now — two fighters, three difficulties, seven backdrops and three switches
+     — and a grid that centres content taller than the window hides both ends of
+     it with no way to reach them. `safe` centring gives that up the moment it
+     would start cutting things off. */
+  #select { position: fixed; inset: 0; z-index: 5; display: grid;
+            justify-content: center; align-content: safe center;
+            justify-items: center; gap: 6px; padding: 16px 10px;
+            overflow-y: auto; background: #10141a; text-align: center; }
   #select h1 { color: #f4e7cf; font-size: clamp(24px, 4vw, 40px); margin: 0 0 2px;
                letter-spacing: .08em; }
   #select h1 span { color: #ffd76a; }
@@ -140,10 +157,38 @@
   #roster .blurb { color: #8b95a3; font-size: 13px; line-height: 1.5; min-height: 2.6em; }
   #roster .key { color: #5d6773; font-size: 12px; letter-spacing: .14em; }
 
+  /* On a phone the same screen has to fit in a third of the width. Smaller
+     portraits are what buys the room — two cards side by side rather than one
+     above the other is worth more than either card being large. */
+  @media (max-width: 560px) {
+    #roster { gap: 10px; }
+    #roster button { width: 154px; padding: 8px; }
+    #roster canvas { width: 112px; height: 112px; }
+    #roster .name { font-size: 16px; }
+    #roster .blurb { font-size: 11px; min-height: 3.4em; }
+    #levels button { min-width: 104px; padding: 6px 10px; }
+    #levels .blurb { display: none; }
+    #scenes img { width: 82px; height: 46px; }
+  }
+
   /* Difficulty, under the roster: one row, all three visible, the chosen one
      lit. A dropdown would hide two thirds of the decision behind a click, and
      the whole point is that a player can see what they are turning down. */
   #select .tier { margin: 16px 0 0; font-size: 13px; }
+
+  /* The backdrops, as themselves. Seven names in a row would be a quiz; the
+     paintings are the only honest way to choose between paintings. */
+  #scenes { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center;
+            margin-top: 8px; max-width: min(94vw, 860px); }
+  #scenes button { padding: 0; background: #1b2028; border: 2px solid #39424f;
+                   border-radius: 9px; overflow: hidden; cursor: pointer;
+                   font: inherit; color: #8b95a3; display: grid; gap: 0;
+                   justify-items: center; }
+  #scenes img { display: block; width: 104px; height: 58px; object-fit: cover; }
+  #scenes .name { font-size: 11px; letter-spacing: .06em; padding: 4px 6px 5px; }
+  #scenes button:hover, #scenes button:focus-visible { border-color: #ffd76a;
+                                                       outline: none; }
+  #scenes button[aria-pressed="true"] { border-color: #ffd76a; color: #ffd76a; }
   #levels { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center;
             margin-top: 8px; }
   #levels button { background: #1b2028; border: 2px solid #39424f; border-radius: 10px;
@@ -210,6 +255,7 @@
   <b></b>
   <button class="skip" id="tip-skip" type="button">SKIP</button>
 </div>
+<div id="loop" hidden></div>
 <div id="paused" hidden>PAUSED<div class="again">P or ❚❚ to resume</div></div>
 
 <div id="select">
@@ -218,10 +264,13 @@
   <div id="roster"></div>
   <p class="tier">Difficulty</p>
   <div id="levels" role="group" aria-label="Difficulty"></div>
+  <p class="tier">Background</p>
+  <div id="scenes" role="group" aria-label="Background"></div>
   <p class="foot">1 / 2 or click · then ← → to move, J punch, K kick, L block</p>
   <div class="switches">
     <button id="music" class="switch" type="button" aria-pressed="true">♪ MUSIC ON</button>
     <button id="tutorial" class="switch" type="button" aria-pressed="true">? TUTORIAL ON</button>
+    <button id="endless" class="switch" type="button" aria-pressed="false">∞ INFINITE OFF</button>
   </div>
 </div>
 <div id="loading">LOADING…</div>

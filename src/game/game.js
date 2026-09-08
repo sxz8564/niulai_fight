@@ -34,6 +34,16 @@ export class Game {
      * A returning player gets no object at all rather than a finished one, so
      * nothing in the frame has to keep asking whether it is over.
      */
+    this.backgroundId = options.background || 'orchard-day';
+    /*
+     * Infinite mode. Clearing the last gate starts the level again instead of
+     * ending the run, and nothing is put back: the same lives, the same health,
+     * the same score, and a stage number that keeps counting. The only way out
+     * is the ordinary one — running out of lives.
+     */
+    this.endless = Boolean(options.endless);
+    this.loop = 0;
+    this.loopFlash = 0;
     this.tutorial = options.tutorial
       ? new Tutorial(options.onTutorialDone || (() => {}))
       : null;
@@ -53,6 +63,13 @@ export class Game {
     this.cheerTime = 0;
     this.spawnQueue = 0;
     this.spawnTimer = 0;
+    // The camera's own displacement, kept apart from where the camera is: the
+    // frame that follows has to lerp from where the shot actually wants to be,
+    // not from wherever the last rumble left it.
+    this.shakeLeft = 0;
+    this.shakeFor = 0;
+    this.shakePower = 0;
+    this.shaken = new THREE.Vector2();
 
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
     this.renderer.setPixelRatio(Math.min(2, globalThis.devicePixelRatio || 1));
@@ -60,8 +77,9 @@ export class Game {
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color('#cfe3f2');
-    this.scene.fog = new THREE.Fog('#cfe3f2', 22, 46);
+    // Replaced in load() by the colour sampled from the chosen painting. This
+    // one only has to exist for the frame or two before that happens.
+    this.setSky('#cfe3f2');
 
     /*
      * A near-orthographic long lens. A wide perspective camera makes a
@@ -99,10 +117,21 @@ export class Game {
       [spec.id, await twice(() => loader.loadAsync(`${this.assetBase}models/${spec.file}`))]));
     this.gltfs = Object.fromEntries(gltfs);
 
+    /*
+     * The backdrop, and the two things that have to agree with it: the colour
+     * of the air, and how much light there is. Both come off the painting
+     * itself — a night valley behind a field lit like noon is the sort of
+     * thing nobody can name but everybody sees.
+     */
+    const backgrounds = await twice(() =>
+      fetch(`${this.assetBase}scenes/index.json`).then((r) => r.json()));
+    this.backgrounds = backgrounds;
+    this.background = backgrounds.find((b) => b.id === this.backgroundId) || backgrounds[0];
     const backdrop = await new THREE.TextureLoader()
-      .loadAsync(`${this.assetBase}scenes/orchard-day.webp`).catch(() => null);
+      .loadAsync(`${this.assetBase}scenes/${this.background.file}`).catch(() => null);
 
-    this.lights();
+    this.setSky(this.background.sky);
+    this.lights(this.background.sky);
     buildStage(this.scene, { backdrop });
 
     const hero = this.specs[this.playerId];
@@ -137,9 +166,31 @@ export class Game {
     return this;
   }
 
-  lights() {
-    this.scene.add(new THREE.HemisphereLight('#dfefff', '#5a6b3a', 1.05));
-    const sun = new THREE.DirectionalLight('#fff4dd', 1.5);
+  /** The air the fight happens in: what is behind everything, and what the
+   * distance fades into. One colour, so they can never disagree. */
+  setSky(colour) {
+    const sky = new THREE.Color(colour);
+    this.scene.background = sky;
+    this.scene.fog = new THREE.Fog(sky.clone(), 22, 46);
+  }
+
+  /**
+   * Lit to match the sky it is under.
+   *
+   * The brightness is the sky's own, with a floor: a fight nobody can read is
+   * worse than a fight lit wrongly, so the darkest painting still leaves two
+   * thirds of the light on. The tint is pulled most of the way back to white
+   * for the same reason — enough that a night scene reads as night, not so
+   * much that the characters change colour.
+   */
+  lights(colour = '#dfefff') {
+    const sky = new THREE.Color(colour);
+    const luma = 0.2126 * sky.r + 0.7152 * sky.g + 0.0722 * sky.b;
+    const dim = Math.min(1, 0.6 + 0.45 * luma);
+    const wash = (base, towards) => new THREE.Color(base).lerp(sky, towards);
+
+    this.scene.add(new THREE.HemisphereLight(wash('#dfefff', 0.55), '#5a6b3a', 1.05 * dim));
+    const sun = new THREE.DirectionalLight(wash('#fff4dd', 0.35), 1.5 * dim);
     sun.position.set(6, 12, 8);
     sun.castShadow = true;
     sun.shadow.mapSize.set(1024, 1024);
@@ -214,6 +265,7 @@ export class Game {
     this.player.update(dt);
     for (const enemy of this.enemies) enemy.update(dt);
 
+    if (this.loopFlash > 0) this.loopFlash = Math.max(0, this.loopFlash - dt);
     this.resolveHits();
     this.collide();
     this.cull();
@@ -429,9 +481,12 @@ export class Game {
     if (gate.opened && this.spawnQueue === 0 && this.enemies.length === 0) {
       this.gateIndex += 1;
       if (this.gateIndex >= this.gates.length) {
-        this.over = true;
-        this.won = true;
-        this.celebrate();
+        if (this.endless) this.loopLevel();
+        else {
+          this.over = true;
+          this.won = true;
+          this.celebrate();
+        }
       }
       this.onState(this.snapshot());
     }
@@ -489,7 +544,41 @@ export class Game {
    * strange way to end four minutes of work. So a win hands the frame over to
    * `cheer()` instead of stopping it.
    */
+  /*
+   * Round again, from the top of a level that has never been fought.
+   *
+   * The fresh gates are the point: `opened` is written to as each wave
+   * triggers, so the second lap has to be a new list or every fight in it is
+   * already over. Everything that belongs to the player — lives, health, score,
+   * the rage meter, which fighter they are in — is deliberately left alone.
+   * That is the whole mode.
+   */
+  loopLevel() {
+    this.loop += 1;
+    this.gates = gatesFor(this.difficulty);
+    this.gateIndex = 0;
+    this.spawnQueue = 0;
+    this.boss = null;
+    // Back to the start of the belt, camera and all. A pan across the whole
+    // level would be two seconds of empty field.
+    this.player.position.set(0, 0, 0.2);
+    this.player.velocity.set(0, 0, 0);
+    this.camera.position.x = 0;
+    this.shaken.set(0, 0);
+    this.shakeLeft = 0;
+    this.loopFlash = 2.4;
+    this.sounds.play('confirm');
+  }
+
   celebrate() {
+    // Whatever was still shaking is over. The offset is already in the camera's
+    // position, and the celebration moves the camera itself, so it has to come
+    // back out here or it stays in the shot for good.
+    this.camera.position.x -= this.shaken.x;
+    this.camera.position.y -= this.shaken.y;
+    this.shaken.set(0, 0);
+    this.shakeLeft = 0;
+
     const p = this.player;
     p.velocity.set(0, 0, 0);
     p.attackTimer = 0;
@@ -586,10 +675,52 @@ export class Game {
     }
     const lead = this.boss ? 2.0 : 2.2;
     target = Math.max(0, Math.min(target, this.boundary - lead));
+    // Out of the shot, follow, back into it. Everything between these two lines
+    // works on where the camera would be if nothing were shaking it.
+    this.camera.position.x -= this.shaken.x;
+    this.camera.position.y -= this.shaken.y;
     this.camera.position.x += (target - this.camera.position.x) * Math.min(1, dt * 3.2);
-    this.camera.lookAt(this.camera.position.x + 0.6, 1.0, 0);
-    this.sun.position.set(this.camera.position.x + 6, 12, 8);
-    this.sun.target.position.set(this.camera.position.x, 0, 0);
+    const base = this.camera.position.x;
+    this.rumble(dt);
+    this.camera.position.x += this.shaken.x;
+    this.camera.position.y += this.shaken.y;
+
+    this.camera.lookAt(base + 0.6, 1.0, 0);
+    this.sun.position.set(base + 6, 12, 8);
+    this.sun.target.position.set(base, 0, 0);
+  }
+
+  /**
+   * Shakes the camera. `power` is in world units of throw, which is the same
+   * unit everything else on the field is measured in.
+   */
+  shake(power = 0.3, seconds = 0.8) {
+    // A second shout while the ground is still moving should not cancel the
+    // first one down to nothing.
+    this.shakePower = Math.max(this.shakePower, power);
+    this.shakeFor = Math.max(this.shakeFor, seconds);
+    this.shakeLeft = Math.max(this.shakeLeft, seconds);
+  }
+
+  /*
+   * Around fourteen and ten hertz — fast enough to read as a shake at sixty
+   * frames a second rather than a wobble, and two frequencies that do not
+   * divide into each other, so the axes never fall into step and draw a line
+   * across the screen instead of a rumble. It decays squared: a herd hits, and
+   * then the ground is still settling for a moment, which is a different shape
+   * from a fade.
+   */
+  rumble(dt) {
+    if (this.shakeLeft <= 0) {
+      this.shaken.set(0, 0);
+      return;
+    }
+    this.shakeLeft = Math.max(0, this.shakeLeft - dt);
+    const left = this.shakeLeft / this.shakeFor;
+    const power = this.shakePower * left * left;
+    const t = this.time;
+    this.shaken.set(Math.sin(t * 88) * power, Math.cos(t * 61) * power * 0.6);
+    if (this.shakeLeft <= 0) this.shakePower = 0;
   }
 
   snapshot() {
@@ -609,8 +740,16 @@ export class Game {
       // Clamped: clearing the last gate walks the index one past the end, which
       // is how the game knows it is won — but "STAGE 6/5" on the winning screen
       // reads as a bug to everyone who sees it.
-      stage: Math.min(this.gateIndex + 1, this.gates.length),
-      stages: this.gates.length,
+      // Keeps counting across laps: stage 6 of an endless run is the first gate
+      // of the second lap, and calling it stage 1 again would throw away the
+      // only number the mode is played for besides the score.
+      stage: this.loop * this.gates.length +
+        Math.min(this.gateIndex + 1, this.gates.length),
+      // No total to be a fraction of, once it goes round for ever.
+      stages: this.endless ? null : this.gates.length,
+      loop: this.loop,
+      loopFlash: this.loopFlash,
+      background: this.background ? this.background.id : this.backgroundId,
       difficulty: this.difficulty.id,
       difficultyName: this.difficulty.name,
       tutorial: this.tutorial ? this.tutorial.state() : null,

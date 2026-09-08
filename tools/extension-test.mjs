@@ -60,6 +60,12 @@ for (const spec of registry) {
   if (spec.file) referenced.push(`assets/models/${spec.file}`);
   if (spec.power && spec.power.shout) referenced.push(`assets/${spec.power.shout}`);
 }
+const backgrounds = JSON.parse(readFileSync(join(root, 'assets/scenes/index.json'), 'utf8'));
+for (const scene of backgrounds) {
+  referenced.push(`assets/scenes/${scene.file}`);
+  if (scene.thumb) referenced.push(`assets/scenes/${scene.thumb}`);
+}
+
 const bank = JSON.parse(readFileSync(join(root, 'assets/audio/index.json'), 'utf8'));
 for (const entry of Object.values(bank)) {
   referenced.push(`assets/audio/${typeof entry === 'string' ? entry : entry.file}`);

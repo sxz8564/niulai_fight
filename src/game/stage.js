@@ -20,6 +20,10 @@ export const STAGE_START = -4;  // where the level begins
  */
 export const STAGE_END = 158;   // where the level stops
 
+/* How tall the painted backdrop stands. The width of one painting is this
+ * times its own aspect ratio — see buildStage. */
+const BACKDROP_HEIGHT = 22;
+
 const TREE_COLORS = ['#3f6d3a', '#4b7a3f', '#356034', '#5b8a45'];
 
 function tree(rng, x, z, kind) {
@@ -117,19 +121,26 @@ export function buildStage(scene, textures) {
   scene.add(tufts);
 
   /*
-   * The painted backdrop, on a plane far behind everything. It is one of the
+   * The painted backdrop, on a plane far behind everything. These are the
    * scenes the filter ships, which keeps the two products looking related and
    * costs nothing to draw.
+   *
+   * The plane is 22 units tall and the paintings are 16:9, so one whole
+   * painting is 39 units wide — and that number has to come from the image
+   * rather than from a constant. It used to be 27.7, which squeezed a 16:9
+   * painting into 5:4 and left every tree in the distance too narrow for its
+   * height. Nothing about the game said so; it just looked slightly wrong.
    */
   if (textures.backdrop) {
     textures.backdrop.colorSpace = THREE.SRGBColorSpace;
     textures.backdrop.wrapS = THREE.RepeatWrapping;
-    // Tiled at a fixed size on the ground rather than a fixed number of
-    // repeats, so the painting behind a long level is not a stretched one.
+    const image = textures.backdrop.image;
+    const aspect = image && image.height ? image.width / image.height : 16 / 9;
     const width = STAGE_END + 80;
-    textures.backdrop.repeat.set(Math.round(width / 27.7), 1);
+    // Whole tiles, so the seam never lands mid-tree in the middle of the level.
+    textures.backdrop.repeat.set(Math.max(1, Math.round(width / (BACKDROP_HEIGHT * aspect))), 1);
     const sky = new THREE.Mesh(
-      new THREE.PlaneGeometry(width, 22),
+      new THREE.PlaneGeometry(width, BACKDROP_HEIGHT),
       new THREE.MeshBasicMaterial({ map: textures.backdrop, depthWrite: false }));
     sky.position.set(STAGE_END / 2 - 6, 8, -18);
     scene.add(sky);

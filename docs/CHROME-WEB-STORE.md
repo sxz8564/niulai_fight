@@ -38,6 +38,14 @@ will see and do, not how it is built.
 > Walk right. The screen stops. Wolves arrive. Clear them and the screen lets
 > you on — through woods and grassland, all the way to the Cart.
 >
+> Seven backdrops, and a mode with no end
+>
+> Pick the painting the fight happens in front of — an orchard at noon, a
+> valley at dusk, a wood in every colour there is — and turn on infinite mode
+> if you would rather the level never stopped. Clear the last stage and it
+> starts again with your lives, your health and your score exactly where you
+> left them, counting upward, until you run out.
+>
 > Three difficulties
 >
 > • Easy: five stages, wolves that go down quickly.

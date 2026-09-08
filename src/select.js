@@ -39,7 +39,7 @@ export async function chooseCharacter(assetBase, root) {
        * has focus is a keystroke meant for that row.
        */
       const focused = document.activeElement;
-      if (focused && focused.closest && focused.closest('#levels, .switches')) return;
+      if (focused && focused.closest && focused.closest('#levels, #scenes, .switches')) return;
       const index = Number(event.key) - 1;
       if (heroes[index]) { event.preventDefault(); pick(heroes[index].id); }
       if (event.key === 'Enter' && heroes[0]) pick(heroes[0].id);

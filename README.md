@@ -102,6 +102,40 @@ builds a gate list from it. The level was a constant in `game.js` before this
 and is now generated per run, which also means a run can no longer inherit the
 gates another one left open.
 
+## Where it is played
+
+Seven painted backdrops, all of them out of Critter Cam — the same paintings
+that project puts behind a webcam, which is what keeps the two looking like one
+thing. They are chosen on the roster screen, as pictures: seven names in a row
+would be a quiz.
+
+Two numbers come off each painting rather than out of anybody's judgement, and
+`npm run scenes` produces both (`tools/make-scenes.mjs`). The first is a thumbnail, because seven
+full backdrops is most of a megabyte and that is a silly price for a menu. The
+second is the sky colour, sampled from the top of the image, and it does more
+work than it sounds like: it is what the game paints behind everything, what it
+fogs the far trees into, and — scaled by its own brightness, with a floor so
+the fight stays readable — how much light there is. A night valley behind a
+field lit like noon is the sort of thing nobody can name but everybody sees.
+
+The paintings are 16:9 and the backdrop plane is 22 units tall, so one whole
+painting is 39 units wide. That number now comes from the image. It used to be
+27.7, which squeezed 16:9 into 5:4 and left every tree in the distance slightly
+too narrow for its height — nothing in the game said so, it just looked wrong.
+
+## Infinite mode
+
+A switch on the roster screen. Clear the last stage and the level starts again
+instead of ending: fresh gates, back to the top of the belt, and **nothing put
+back** — the same lives, the same health, the same score, the same rage in the
+meter, and a stage number that keeps counting. Stage 6 is the first gate of the
+second lap, and the HUD says `6/∞` because there is no total to be a fraction
+of. The only way out is the ordinary one, which is running out of lives.
+
+The fresh gates are the part that matters: `opened` is written to as each wave
+triggers, so a second lap that reused the list would find every fight in it
+already over.
+
 ## Sound
 
 Five short files, played through `<audio>` elements. No mixer, no graph, no
@@ -284,6 +318,15 @@ transformation: one frame a leopard cub, the next a jaguar warrior a third again
 as tall, with nothing on screen connecting the two. Both the growth and the
 shrink happen *inside* the seven seconds, so the number on the bar is the number
 of seconds she is actually stronger for.
+
+The ground goes first. Ten animals arriving at a run is the loudest thing in
+the game and it used to happen in a perfectly steady shot; the camera now takes
+a shake at the moment the herd lands — decaying squared, on two frequencies that
+do not divide into each other, so the axes never fall into step and draw a line
+across the screen instead of a rumble. `shake` and `shakeFor` in the registry
+are how hard and how long. It is applied as an offset the camera keeps outside
+its own position, so the frame after it still follows the player from where the
+shot wanted to be rather than from wherever the last jolt left it.
 
 Which of the two a character gets is `kind` in the registry — `summon` or
 `transform`. A character with no `power` block still gets no meter, no key and

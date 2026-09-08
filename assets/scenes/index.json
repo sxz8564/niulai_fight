@@ -1,0 +1,58 @@
+[
+  {
+    "id": "orchard-day",
+    "name": "Orchard Day",
+    "nameChinese": "果园白日",
+    "file": "orchard-day.webp",
+    "thumb": "thumbs/orchard-day.webp",
+    "sky": "#ebe6b3"
+  },
+  {
+    "id": "cattle-valley",
+    "name": "Cattle Valley",
+    "nameChinese": "牛谷",
+    "file": "cattle-valley.webp",
+    "thumb": "thumbs/cattle-valley.webp",
+    "sky": "#7b7676"
+  },
+  {
+    "id": "golden-grove",
+    "name": "Golden Grove",
+    "nameChinese": "金林",
+    "file": "golden-grove.webp",
+    "thumb": "thumbs/golden-grove.webp",
+    "sky": "#9c7040"
+  },
+  {
+    "id": "paintbox-wood",
+    "name": "Paintbox Wood",
+    "nameChinese": "彩林",
+    "file": "paintbox-wood.webp",
+    "thumb": "thumbs/paintbox-wood.webp",
+    "sky": "#936145"
+  },
+  {
+    "id": "pale-plain",
+    "name": "Pale Plain",
+    "nameChinese": "苍原",
+    "file": "pale-plain.webp",
+    "thumb": "thumbs/pale-plain.webp",
+    "sky": "#e0d7ca"
+  },
+  {
+    "id": "lantern-night",
+    "name": "Lantern Night",
+    "nameChinese": "灯夜",
+    "file": "lantern-night.webp",
+    "thumb": "thumbs/lantern-night.webp",
+    "sky": "#0b252b"
+  },
+  {
+    "id": "star-valley",
+    "name": "Star Valley",
+    "nameChinese": "星谷",
+    "file": "star-valley.webp",
+    "thumb": "thumbs/star-valley.webp",
+    "sky": "#7e7977"
+  }
+]

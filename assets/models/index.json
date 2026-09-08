@@ -83,6 +83,8 @@
       "cast": 1.0,
       "release": 0.45,
       "shout": "audio/mama.webm",
+      "shake": 0.34,
+      "shakeFor": 0.9,
       "summon": "mama",
       "count": 10,
       "lanes": 5,
