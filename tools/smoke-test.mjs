@@ -65,6 +65,17 @@ page.on('requestfailed', (r) => {
   transients.push(`${why} ${r.url().replace(/^https?:\/\/[^/]+/, '')}`);
 });
 
+/*
+ * The browser complains once when it runs out of WebGL contexts and starts
+ * throwing the oldest away. It is the only warning of a leak that is otherwise
+ * invisible until the round after it, which simply never starts — and this
+ * suite goes home and back often enough to provoke it.
+ */
+const starved = [];
+page.on('console', (message) => {
+  if (/too many active webgl contexts/i.test(message.text())) starved.push(message.text());
+});
+
 await page.goto(url, { waitUntil: 'load' });
 // The select screen comes first now, so the harness picks for itself.
 await page.waitForFunction(() => globalThis.__niulaiFight, null, { timeout: 60000 });
@@ -110,6 +121,36 @@ await page.waitForFunction(() => globalThis.__niulaiFight.game, null, { timeout:
 await page.evaluate(() => globalThis.__niulaiFight.stop());
 
 const api = (fn, ...args) => page.evaluate(fn, ...args);
+
+/*
+ * The next round, through the door a player uses. Home goes to the roster
+ * rather than straight into another round, so this is two steps now: leave,
+ * and choose again. Whatever the roster has been set to — difficulty, backdrop,
+ * infinite mode — is what the new round is played on.
+ */
+async function nextRound(fighter = 'niulai') {
+  await page.click('#t-home');
+  /*
+   * Waits for the roster to be up and populated, not merely for the round to be
+   * gone. The game object is deleted a moment before the roster starts offering
+   * anything, and a choice made in that gap is dropped on the floor — which
+   * looked exactly like the roster never appearing.
+   */
+  await page.waitForFunction(() => !globalThis.__niulaiFight.game &&
+    document.querySelectorAll('#roster button').length > 0, null, { timeout: 60000 });
+  await page.evaluate((who) => globalThis.__niulaiFight.choose(who), fighter);
+  const started = await page
+    .waitForFunction(() => globalThis.__niulaiFight.game, null, { timeout: 60000 })
+    .then(() => true).catch(() => false);
+  // A round that never starts is a defect with a name, not a reason to sit
+  // here until the timeout and take every check after this one down with it.
+  if (!started) {
+    check('a round starts when one is chosen from the roster', false,
+      starved.length ? 'the browser ran out of WebGL contexts' : 'nothing loaded');
+  }
+  await api(() => globalThis.__niulaiFight.stop());
+  return started;
+}
 
 check('the page loads with no script errors', errors.length === 0, errors[0] || '');
 
@@ -1714,10 +1755,10 @@ await page.screenshot({ path: join(shots, '5-win.png'), animations: 'disabled' }
  *
  * Music, pause and restart, without leaving the fight.
  */
-const controlsExist = await page.evaluate(() => ['t-music', 't-pause', 't-restart']
+const controlsExist = await page.evaluate(() => ['t-music', 't-pause', 't-home']
   .filter((id) => !document.getElementById(id)));
 check('the fight has its three controls', controlsExist.length === 0,
-  controlsExist.length ? `missing: ${controlsExist.join(', ')}` : 'music, pause, restart');
+  controlsExist.length ? `missing: ${controlsExist.join(', ')}` : 'music, pause, home');
 
 /*
  * Pause has to stop the clock, not the frame. The scene stays on screen behind
@@ -1820,10 +1861,22 @@ const survived = await api(() => {
 check('the music and pause buttons do not end the run under them',
   survived.score === 4321, `score ${survived.score} after four clicks on a finished run`);
 
-/* The restart button, on the other hand, is meant to. */
-await page.click('#t-restart');
-await page.waitForFunction(() => globalThis.__niulaiFight.game &&
-  globalThis.__niulaiFight.game.score === 0, null, { timeout: 60000 });
+/*
+ * The home button, on the other hand, is meant to end the round — and it goes
+ * to the roster rather than into another round of the same thing, because a
+ * player leaving a fight wants to change something, and the fighter, the
+ * difficulty and the backdrop all live on that screen.
+ */
+await page.click('#t-home');
+await page.waitForFunction(() => !globalThis.__niulaiFight.game &&
+  !document.getElementById('select').hidden, null, { timeout: 60000 });
+check('the home button goes back to the roster',
+  await page.evaluate(() => !document.getElementById('select').hidden &&
+    document.querySelectorAll('#roster button').length > 0),
+  'the roster is up');
+
+await page.evaluate(() => globalThis.__niulaiFight.choose('niulai'));
+await page.waitForFunction(() => globalThis.__niulaiFight.game, null, { timeout: 120000 });
 const restarted = await api(() => {
   const g = globalThis.__niulaiFight.game;
   globalThis.__niulaiFight.stop();   // back to driving the clock ourselves
@@ -1833,7 +1886,7 @@ const restarted = await api(() => {
     paused: !document.getElementById('paused').hidden
   };
 });
-check('the restart button starts a fresh round with the same fighter',
+check('and choosing from it starts a clean round',
   restarted.score === 0 && restarted.over === false && restarted.player === 'niulai' &&
   !restarted.anyGateOpened && !restarted.paused,
   `${restarted.player}, score ${restarted.score}`);
@@ -1943,10 +1996,7 @@ check('choosing one lights it up and remembers it',
 /* Tagged so the wait below is for the *next* round rather than for a state the
  * current one might already be in — and so a setting that never reaches the
  * game fails a check instead of hanging until the timeout. */
-await api(() => { globalThis.__niulaiFight.game.__previous = true; });
-await page.click('#t-restart');
-await page.waitForFunction(() => globalThis.__niulaiFight.game &&
-  !globalThis.__niulaiFight.game.__previous, null, { timeout: 120000 });
+await nextRound();
 const onHard = await api(() => {
   const g = globalThis.__niulaiFight.game;
   globalThis.__niulaiFight.stop();          // back to driving the clock ourselves
@@ -2011,11 +2061,7 @@ const doAction = (action, seconds) => api(([act, secs]) => {
 }, [action, seconds]);
 
 await api(() => globalThis.__niulaiFight.setTutorial(true));
-await api(() => { globalThis.__niulaiFight.game.__previous = true; });
-await page.click('#t-restart');
-await page.waitForFunction(() => globalThis.__niulaiFight.game &&
-  !globalThis.__niulaiFight.game.__previous, null, { timeout: 120000 });
-await api(() => globalThis.__niulaiFight.stop());
+await nextRound();
 
 const lesson1 = await teach();
 check('turning the tutorial on teaches the next round', lesson1.lesson === 1 && lesson1.shown,
@@ -2108,11 +2154,7 @@ check('every lesson is worded for a keyboard and for a thumb',
 
 /* And the way out, for a player who does not want to be taught. */
 await api(() => globalThis.__niulaiFight.setTutorial(true));
-await api(() => { globalThis.__niulaiFight.game.__previous = true; });
-await page.click('#t-restart');
-await page.waitForFunction(() => globalThis.__niulaiFight.game &&
-  !globalThis.__niulaiFight.game.__previous, null, { timeout: 120000 });
-await api(() => globalThis.__niulaiFight.stop());
+await nextRound();
 const beforeEscape = await teach();
 await page.keyboard.press('Escape');
 await api(() => globalThis.__niulaiFight.step(0.1));
@@ -2129,11 +2171,7 @@ check('Escape skips it, and skipping counts as having been taught',
 
 /* The same exit, for the hand that has no Escape key. */
 await api(() => globalThis.__niulaiFight.setTutorial(true));
-await api(() => { globalThis.__niulaiFight.game.__previous = true; });
-await page.click('#t-restart');
-await page.waitForFunction(() => globalThis.__niulaiFight.game &&
-  !globalThis.__niulaiFight.game.__previous, null, { timeout: 120000 });
-await api(() => globalThis.__niulaiFight.stop());
+await nextRound();
 const beforeButton = await teach();
 await page.click('#tip-skip');
 const byButton = await api(() => ({
@@ -2205,6 +2243,45 @@ check('a backdrop is drawn at the shape it was painted at',
   drawn ? `${painted.toFixed(2)} against ${drawn.image.toFixed(2)} (${drawn.src})` : 'no backdrop');
 
 /*
+ * And how much of it anybody actually sees. The camera looks slightly down, so
+ * the strip of screen above the horizon is a letterbox about five times wider
+ * than it is high; a plane sized without regard to that showed the bottom sixth
+ * of each painting blown up — a hill and half a rock, with the trees and the
+ * sky cut off above the frame. Reported as the backdrops being too large.
+ */
+const framing = await api(() => {
+  const g = globalThis.__niulaiFight.game;
+  const camera = g.camera;
+  camera.updateMatrixWorld(true);
+  let sky = null;
+  g.scene.traverse((node) => {
+    if (!sky && node.isMesh && node.material && node.material.map &&
+        node.geometry.parameters && node.geometry.parameters.width > 100) sky = node;
+  });
+  if (!sky) return null;
+  const height = sky.geometry.parameters.height;
+  const foot = sky.position.y - height / 2;
+  const ndcOf = (y) => {
+    const point = sky.position.clone();
+    point.set(camera.position.x, y, sky.position.z);
+    point.project(camera);
+    return point.y;
+  };
+  // The highest point on the plane still inside the frame, found by halving.
+  let low = 0;
+  let high = 80;
+  for (let i = 0; i < 40; i++) {
+    const mid = (low + high) / 2;
+    if (ndcOf(mid) > 1) high = mid; else low = mid;
+  }
+  // The ground hides everything below y = 0, so that is where seeing starts.
+  return { height, foot, top: low, seen: (low - Math.max(0, foot)) / height };
+});
+check('a painting is seen as a painting, not as its bottom edge',
+  framing && framing.seen > 0.4,
+  framing ? `${Math.round(framing.seen * 100)}% of it is in frame` : 'no backdrop');
+
+/*
  * And the ground in front of it. Every painting names its own field: a fight in
  * front of a violet wood at sunset standing on orchard green is two pictures in
  * one, and no amount of matching the sky fixes that.
@@ -2265,11 +2342,7 @@ check('the field on screen is the one its backdrop asked for',
 
 /* And the air in front of it. */
 await api(() => globalThis.__niulaiFight.setBackground('lantern-night'));
-await api(() => { globalThis.__niulaiFight.game.__previous = true; });
-await page.click('#t-restart');
-await page.waitForFunction(() => globalThis.__niulaiFight.game &&
-  !globalThis.__niulaiFight.game.__previous, null, { timeout: 120000 });
-await api(() => globalThis.__niulaiFight.stop());
+await nextRound();
 const night = await api(() => {
   const g = globalThis.__niulaiFight.game;
   const lights = [];
@@ -2340,11 +2413,7 @@ check('and the shot is steady again afterwards', ground.settled < 0.03,
  * Infinite mode. The level starts over and nothing else does.
  */
 await api(() => globalThis.__niulaiFight.setEndless(true));
-await api(() => { globalThis.__niulaiFight.game.__previous = true; });
-await page.click('#t-restart');
-await page.waitForFunction(() => globalThis.__niulaiFight.game &&
-  !globalThis.__niulaiFight.game.__previous, null, { timeout: 120000 });
-await api(() => globalThis.__niulaiFight.stop());
+await nextRound();
 const wrapped = await api(() => {
   const g = globalThis.__niulaiFight.game;
   g.score = 7700;
@@ -2385,11 +2454,7 @@ check('the level it starts again is one nobody has fought',
 
 /* And with it off, the last stage is still the last one. */
 await api(() => globalThis.__niulaiFight.setEndless(false));
-await api(() => { globalThis.__niulaiFight.game.__previous = true; });
-await page.click('#t-restart');
-await page.waitForFunction(() => globalThis.__niulaiFight.game &&
-  !globalThis.__niulaiFight.game.__previous, null, { timeout: 120000 });
-await api(() => globalThis.__niulaiFight.stop());
+await nextRound();
 const finite = await api(() => {
   const g = globalThis.__niulaiFight.game;
   for (const enemy of g.enemies) g.scene.remove(enemy.root);
@@ -2420,11 +2485,7 @@ await api(() => {
   localStorage.removeItem('niulai-fight.name');
 });
 await api(() => globalThis.__niulaiFight.setEndless(false));
-await api(() => { globalThis.__niulaiFight.game.__previous = true; });
-await page.click('#t-restart');
-await page.waitForFunction(() => globalThis.__niulaiFight.game &&
-  !globalThis.__niulaiFight.game.__previous, null, { timeout: 120000 });
-await api(() => globalThis.__niulaiFight.stop());
+await nextRound();
 
 /* Lose one, on purpose, with a score that lands in the middle of the board. */
 await api(() => {
@@ -2546,6 +2607,10 @@ await api(() => globalThis.__niulaiFight.stop());
 check('a new round puts the board away and gives the pad back',
   await page.evaluate(() => document.getElementById('over').hidden &&
     !document.getElementById('pad').hidden));
+
+check('every trip to the roster hands its WebGL contexts back',
+  starved.length === 0,
+  starved.length ? `the browser ran out after ${starved.length} warning(s)` : 'none exhausted');
 
 check('still no script errors after playing', errors.length === 0, errors[0] || '');
 

@@ -11,7 +11,13 @@ import { soundBank } from './game/sound.js';
  * are already loaded a moment later anyway.
  */
 
-export async function chooseCharacter(assetBase, root) {
+/**
+ * @param expose called with the roster's own `pick`, so a choice made from
+ * anywhere else — the test harness, a future menu — goes through the same door
+ * a click does. That door is where the portraits are shut down, and a choice
+ * that skipped it left two live WebGL contexts behind every time.
+ */
+export async function chooseCharacter(assetBase, root, expose = () => {}) {
   const sounds = soundBank(assetBase);
   const registry = await fetch(`${assetBase}models/index.json`).then((r) => r.json());
   const heroes = registry.filter((spec) => spec.playable);
@@ -45,6 +51,7 @@ export async function chooseCharacter(assetBase, root) {
       if (event.key === 'Enter' && heroes[0]) pick(heroes[0].id);
     }
     window.addEventListener('keydown', onKey);
+    expose(pick);
 
     heroes.forEach((spec, index) => {
       const button = document.createElement('button');
@@ -165,6 +172,15 @@ function portrait(canvas, loader, assetBase, spec) {
     stop() {
       stopped = true;
       cancelAnimationFrame(raf);
+      /*
+       * Both, and in this order. dispose() frees what three.js allocated but
+       * leaves the browser holding the WebGL context, and a browser will only
+       * hold so many — around sixteen — before it starts refusing to make new
+       * ones. Every visit to the roster builds two of these, so a player who
+       * goes home often enough would eventually meet a game that would not
+       * start. forceContextLoss is what actually hands the context back.
+       */
+      renderer.forceContextLoss();
       renderer.dispose();
     }
   };

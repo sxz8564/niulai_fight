@@ -187,7 +187,7 @@ const musicButton = document.getElementById('music');
 const tools = {
   music: document.getElementById('t-music'),
   pause: document.getElementById('t-pause'),
-  restart: document.getElementById('t-restart')
+  home: document.getElementById('t-home')
 };
 const pausedScreen = document.getElementById('paused');
 const pad = document.getElementById('pad');
@@ -495,8 +495,12 @@ for (const button of Object.values(tools)) {
 }
 tools.music.addEventListener('click', () => paintMusic(sounds.toggleMusic()));
 tools.pause.addEventListener('click', () => setPaused(!paused));
-tools.restart.addEventListener('click', () => {
-  if (endRound) endRound('again');
+/* Home is the roster, not another round of the same one: a player who wants
+ * out mid-fight wants to change something — the fighter, the difficulty, the
+ * backdrop — and every one of those lives on that screen. Playing the same
+ * round again is what the end of a run offers. */
+tools.home.addEventListener('click', () => {
+  if (endRound) endRound('select');
 });
 window.addEventListener('keydown', (event) => {
   // Only while a round is actually running: P on the roster should do nothing.
@@ -558,8 +562,16 @@ function pickFighter() {
       sounds.play('confirm');
       resolve(id);
     };
-    offerChoice = settle;
-    chooseCharacter('assets/', roster).then(settle);
+    /*
+     * Choosing from anywhere else goes through the roster's own pick, which is
+     * what stops the turning portraits. Resolving around it left their
+     * renderers running, and a browser holds only so many WebGL contexts before
+     * it starts refusing to make more — after half a dozen trips home, the next
+     * round would not start at all.
+     */
+    let pickFromRoster = null;
+    offerChoice = (id) => (pickFromRoster ? pickFromRoster(id) : settle(id));
+    chooseCharacter('assets/', roster, (pick) => { pickFromRoster = pick; }).then(settle);
   });
 }
 

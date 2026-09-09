@@ -806,6 +806,13 @@ export class Game {
         material.dispose();
       }
     });
+    /*
+     * dispose() only. The renderer here lives on the page's one canvas, which
+     * the next round builds a new renderer on — and a canvas whose context has
+     * been deliberately lost never gives out another one. The portraits on the
+     * roster screen do force it, because each of those canvases is thrown away
+     * with the card it belongs to.
+     */
     this.renderer.dispose();
   }
 }

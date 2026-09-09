@@ -31,6 +31,7 @@ Pick a fighter first. **Niulai** is steady — more health, hits harder.
 | **K** | kick |
 | **L** or **Shift** (hold) | block |
 | **M** or **U** | the super, when the rage bar is full — MAMA for Niulai, SUPER for Baola |
+| **⌂** (top right) | back to the roster, mid-fight |
 | **R** (when it ends) | play again |
 | **C** (when it ends) | choose a different fighter |
 
@@ -134,10 +135,22 @@ darkening a night painting's grass as well would take it to mud. The ladder
 holds the grass near where the orchard's sits and lets the lighting do the
 rest, which is why Lantern Night reads as a dark field rather than a black one.
 
-The paintings are 16:9 and the backdrop plane is 22 units tall, so one whole
-painting is 39 units wide. That number now comes from the image. It used to be
-27.7, which squeezed 16:9 into 5:4 and left every tree in the distance slightly
-too narrow for its height — nothing in the game said so, it just looked wrong.
+Two numbers decide how much of a painting anybody ever sees, and neither is
+free. The camera looks slightly down, so the strip of screen above the horizon
+is about four world units tall at the backdrop's distance and twenty-one wide —
+a letterbox five times wider than it is high. A 16:9 painting cannot fill that
+without being cropped or repeating, and the only choice is which.
+
+The plane was 22 units tall, which showed the bottom sixth of each painting
+blown up: a hill and half a rock, with the trees and the sky cut off above the
+frame. It is 8 now — a little over half the painting in view, one copy spanning
+about two thirds of the screen, which is far enough apart that the repeat does
+not read as wallpaper. Its foot sits just under the ground so no seam can open
+along the horizon.
+
+Width comes from the image rather than a constant. It used to be 27.7 units,
+which squeezed 16:9 into 5:4 and left every tree in the distance slightly too
+narrow for its height — nothing in the game said so, it just looked wrong.
 
 ## The board
 
@@ -636,6 +649,18 @@ src/
     ├── scores.js      the ranking board, and the seam a server would go through
     └── input.js       keyboard and touch
 ```
+
+One bug worth knowing about, because it is the kind that hides. Every visit to
+the roster builds two more WebGL contexts for the turning portraits, and a
+browser holds about sixteen before it starts throwing the oldest away — after
+which `new WebGLRenderer` gets nothing and the round simply never starts. The
+portraits now hand their contexts back with `forceContextLoss()` as well as
+`dispose()`, and choosing a fighter from anywhere — including the test harness
+— goes through the roster's own `pick`, which is where that shutdown lives.
+The game's own renderer deliberately does *not* force it: that one lives on the
+page's single canvas, and a canvas whose context has been lost on purpose never
+gives out another. The home button is what made this reachable — before it,
+leaving a fight took finishing one first.
 
 Two decisions worth knowing:
 

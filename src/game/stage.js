@@ -20,9 +20,27 @@ export const STAGE_START = -4;  // where the level begins
  */
 export const STAGE_END = 158;   // where the level stops
 
-/* How tall the painted backdrop stands. The width of one painting is this
- * times its own aspect ratio — see buildStage. */
-const BACKDROP_HEIGHT = 22;
+/*
+ * How tall the painted backdrop stands, and where its foot is.
+ *
+ * These two numbers decide how much of a painting anybody ever sees, and the
+ * answer is not free. The camera looks slightly down, so the strip of screen
+ * above the horizon is only about four world units tall at the backdrop's
+ * distance and twenty-one wide — a letterbox five times wider than it is high.
+ * A 16:9 painting cannot fill that without either being cropped or repeating,
+ * and the only choice is which.
+ *
+ * It was 22, which showed the bottom sixth of each painting blown up: a hill
+ * and half a rock, with the trees and the sky cut off above the frame. At 8 a
+ * little over half of it is in view — whole trees, the hills, some sky — and
+ * one painting spans about two thirds of the screen's width, which is far
+ * enough apart that the repeat does not read as wallpaper.
+ *
+ * The foot sits just under the ground rather than on it, so no seam can open
+ * up along the horizon.
+ */
+const BACKDROP_HEIGHT = 8;
+const BACKDROP_BOTTOM = -0.6;
 
 /*
  * What the field is made of, when nobody says otherwise.
@@ -161,7 +179,7 @@ export function buildStage(scene, textures) {
     const sky = new THREE.Mesh(
       new THREE.PlaneGeometry(width, BACKDROP_HEIGHT),
       new THREE.MeshBasicMaterial({ map: textures.backdrop, depthWrite: false }));
-    sky.position.set(STAGE_END / 2 - 6, 8, -18);
+    sky.position.set(STAGE_END / 2 - 6, BACKDROP_BOTTOM + BACKDROP_HEIGHT / 2, -18);
     scene.add(sky);
   }
 
