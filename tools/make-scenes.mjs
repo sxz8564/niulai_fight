@@ -8,8 +8,8 @@ import { serve } from './serve.mjs';
  * Builds the scene registry from whatever is in assets/scenes.
  *
  * Three things come out of each painting, and none is worth doing by eye. A
- * thumbnail, because seven full backdrops is the better part of a megabyte and
- * that is a silly price for a menu. The sky colour, sampled from the top of
+ * thumbnail, because a wall of full-size backdrops is the better part of a
+ * megabyte and that is a silly price for a menu. The sky colour, sampled from the top of
  * the image, which the game paints behind everything and fogs the distance
  * into. And a ground palette — the grass, the path, the trees and the bushes
  * that stand in front of the painting.
@@ -36,7 +36,6 @@ mkdirSync(thumbs, { recursive: true });
  * not named here still ships — it just gets its filename tidied up. */
 const NAMES = {
   'orchard-day': ['Orchard Day', '果园白日'],
-  'cattle-valley': ['Cattle Valley', '牛谷'],
   'golden-grove': ['Golden Grove', '金林'],
   'paintbox-wood': ['Paintbox Wood', '彩林'],
   'pale-plain': ['Pale Plain', '苍原'],

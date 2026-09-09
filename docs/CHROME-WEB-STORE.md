@@ -38,7 +38,7 @@ will see and do, not how it is built.
 > Walk right. The screen stops. Wolves arrive. Clear them and the screen lets
 > you on — through woods and grassland, all the way to the Cart.
 >
-> Seven backdrops, and a mode with no end
+> Six backdrops, and a mode with no end
 >
 > Pick the painting the fight happens in front of — an orchard at noon, a
 > valley at dusk, a wood in every colour there is — and turn on infinite mode

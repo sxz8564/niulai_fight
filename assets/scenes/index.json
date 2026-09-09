@@ -21,27 +21,6 @@
     }
   },
   {
-    "id": "cattle-valley",
-    "name": "Cattle Valley",
-    "nameChinese": "\u725b\u8c37",
-    "file": "cattle-valley.webp",
-    "thumb": "thumbs/cattle-valley.webp",
-    "sky": "#7b7676",
-    "ground": {
-      "grass": "#6f6f52",
-      "path": "#83836a",
-      "tuft": "#5f6046",
-      "bush": "#4e5a42",
-      "trunk": "#5b4f40",
-      "trees": [
-        "#4c5a41",
-        "#586848",
-        "#41503c",
-        "#657356"
-      ]
-    }
-  },
-  {
     "id": "golden-grove",
     "name": "Golden Grove",
     "nameChinese": "\u91d1\u6797",

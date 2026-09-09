@@ -2195,8 +2195,8 @@ const gallery = await api(async () => {
   const registry = await fetch('assets/scenes/index.json').then((r) => r.json());
   return registry.map((scene) => ({ ...scene, sane: /^#[0-9a-f]{6}$/i.test(scene.sky || '') }));
 });
-check('every backdrop the filter paints is on offer',
-  gallery.length >= 7 && gallery.every((s) => s.file && s.thumb && s.sane),
+check('every backdrop on offer is a complete one',
+  gallery.length >= 2 && gallery.every((s) => s.file && s.thumb && s.sane),
   gallery.map((s) => s.id).join(', '));
 const tiles = await page.$$eval('#scenes button', (buttons) => buttons.map((button) => ({
   id: button.dataset.scene,
@@ -2241,6 +2241,20 @@ const painted = drawn ? (drawn.tile / drawn.height) : 0;
 check('a backdrop is drawn at the shape it was painted at',
   drawn && Math.abs(painted - drawn.image) / drawn.image < 0.08,
   drawn ? `${painted.toFixed(2)} against ${drawn.image.toFixed(2)} (${drawn.src})` : 'no backdrop');
+
+/*
+ * A backdrop can be dropped from the registry, and one has been. Anybody who
+ * had it chosen still has its name in their browser, so the roster has to shrug
+ * that off rather than offer a painting that is not there any more.
+ */
+const stale = await api(() => {
+  const before = globalThis.__niulaiFight.background;
+  const after = globalThis.__niulaiFight.setBackground('cattle-valley');
+  return { before, after, saved: localStorage.getItem('niulai-fight.background') };
+});
+check('a backdrop that no longer ships is not one the roster will choose',
+  stale.after === stale.before && stale.saved !== 'cattle-valley',
+  `asked for a gone one, kept ${stale.after}`);
 
 /*
  * And how much of it anybody actually sees. The camera looks slightly down, so

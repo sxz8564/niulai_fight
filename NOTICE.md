@@ -34,5 +34,5 @@ is MIT — including the artwork. That is not the intention here.
 The meshes were generated with Meshy AI from the owner's own designs, then
 cropped, retextured and rigged by the tooling in the Critter Cam repository.
 The painted backdrops in `assets/scenes/` were supplied by the owner and are
-the same seven paintings Critter Cam ships. Check the terms of whichever
+paintings Critter Cam also ships. Check the terms of whichever
 generator plan produced a given file before redistributing it.

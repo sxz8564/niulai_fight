@@ -105,14 +105,15 @@ gates another one left open.
 
 ## Where it is played
 
-Seven painted backdrops, all of them out of Critter Cam — the same paintings
+Six painted backdrops, all of them out of Critter Cam — the same paintings
 that project puts behind a webcam, which is what keeps the two looking like one
-thing. They are chosen on the roster screen, as pictures: seven names in a row
+thing. They are chosen on the roster screen, as pictures: a column of names
 would be a quiz.
 
 Two numbers come off each painting rather than out of anybody's judgement, and
-`npm run scenes` produces both (`tools/make-scenes.mjs`). The first is a thumbnail, because seven
-full backdrops is most of a megabyte and that is a silly price for a menu. The
+`npm run scenes` produces both (`tools/make-scenes.mjs`). The first is a
+thumbnail, because a wall of full-size backdrops is most of a megabyte and that
+is a silly price for a menu. The
 second is the sky colour, sampled from the top of the image, and it does more
 work than it sounds like: it is what the game paints behind everything, what it
 fogs the far trees into, and — scaled by its own brightness, with a floor so
@@ -123,7 +124,7 @@ Each painting also dresses the field in front of it. Grass, path, tufts,
 bushes, trunks and four tree colours per scene, in the registry beside the
 backdrop — because a fight in front of a violet wood at sunset, standing on
 orchard green, is two pictures in one and no amount of matching the sky fixes
-it. The seven schemes are authored rather than sampled: the tool proposes one
+it. The schemes are authored rather than sampled: the tool proposes one
 by taking the hue of the painting's land and of its foliage and running them
 through the orchard's own ladder — how much lighter the path is than the grass,
 how far under it the bushes sit — and then someone looks at it. An existing
